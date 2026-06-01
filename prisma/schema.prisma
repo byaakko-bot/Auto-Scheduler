@@ -1,0 +1,519 @@
+// ConstructFlow — Prisma schema
+// Generated for the construction-scheduler MVP.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────
+
+enum Role {
+  OWNER
+  ADMIN
+  PROJECT_MANAGER
+  SITE_MANAGER
+  VIEWER
+}
+
+enum ConstructionMethod {
+  REINFORCED_CONCRETE
+  MASONRY_BLOCKWORK
+  STEEL_FRAME
+  TIMBER_FRAME
+  PRECAST_CONCRETE
+  MODULAR
+  AAC_PANELS
+  AAC_BLOCKS
+  HYBRID
+}
+
+enum BuildingType {
+  RESIDENTIAL_APARTMENT
+  RESIDENTIAL_HOUSE
+  COMMERCIAL_OFFICE
+  COMMERCIAL_RETAIL
+  INDUSTRIAL_WAREHOUSE
+  MIXED_USE
+  HOSPITALITY
+  HEALTHCARE
+  EDUCATION
+  INFRASTRUCTURE
+}
+
+enum TaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  DELAYED
+  ON_HOLD
+  CANCELLED
+}
+
+enum RaciRole {
+  RESPONSIBLE
+  ACCOUNTABLE
+  CONSULTED
+  INFORMED
+}
+
+enum PartyType {
+  DEVELOPER
+  GENERAL_CONTRACTOR
+  SITE_MANAGER
+  ARCHITECT
+  STRUCTURAL_ENGINEER
+  MEP_ENGINEER
+  SUBCONTRACTOR
+  SUPPLIER
+  LOGISTICS
+  FINANCE_CONTROLLER
+  QUALITY_INSPECTOR
+  AUTHORITY
+}
+
+enum ShipmentStatus {
+  ORDERED
+  IN_TRANSIT
+  DELIVERED
+  DELAYED
+  CANCELLED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// ─── USERS & COMPANIES ────────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  authId    String   @unique
+  email     String   @unique
+  name      String
+  phone     String?
+  avatarUrl String?
+  role      Role     @default(VIEWER)
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projectMembers  ProjectMember[]
+  raciAssignments RaciAssignment[]
+  progressUpdates ProgressUpdate[]
+  comments        Comment[]
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  country   String
+  city      String?
+  logoUrl   String?
+  createdAt DateTime @default(now())
+
+  users    User[]
+  projects Project[]
+  parties  Party[]
+}
+
+// ─── PROJECTS ─────────────────────────────────────────────────────
+
+model Project {
+  id                 String             @id @default(cuid())
+  name               String
+  code               String             @unique
+  clientName         String?
+  description        String?
+  companyId          String
+  company            Company            @relation(fields: [companyId], references: [id])
+  country            String
+  city               String
+  address            String?
+  latitude           Float?
+  longitude          Float?
+  buildingType       BuildingType
+  constructionMethod ConstructionMethod
+  totalAreaSqm       Float
+  numberOfFloors     Int
+  numberOfUnits      Int?
+  numberOfBasements  Int                @default(0)
+  startDate          DateTime
+  targetEndDate      DateTime
+  actualEndDate      DateTime?
+  workingDaysPerWeek Int                @default(5)
+  workingHoursPerDay Int                @default(8)
+  status             String             @default("PLANNING")
+  currency           String             @default("USD")
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  members        ProjectMember[]
+  buildings      Building[]
+  workPackages   WorkPackage[]
+  tasks          Task[]
+  parties        ProjectParty[]
+  budgets        Budget[]
+  risks          Risk[]
+  documents      Document[]
+  milestones     Milestone[]
+  publicHolidays PublicHoliday[]
+  resources      Resource[]
+  materials      Material[]
+}
+
+model ProjectMember {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id])
+  role      Role
+
+  @@unique([projectId, userId])
+}
+
+model PublicHoliday {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  date      DateTime
+  name      String
+}
+
+// ─── BUILDINGS ────────────────────────────────────────────────────
+
+model Building {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  floors    Int
+  units     Int?
+  areaSqm   Float
+  createdAt DateTime @default(now())
+
+  tasks Task[]
+}
+
+// ─── WORK PACKAGES & TASKS ────────────────────────────────────────
+
+model WorkPackage {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  code      String
+  name      String
+  phase     String
+  sortOrder Int
+  color     String?
+  parentId  String?
+  parent    WorkPackage?  @relation("WPHierarchy", fields: [parentId], references: [id])
+  children  WorkPackage[] @relation("WPHierarchy")
+  createdAt DateTime      @default(now())
+
+  tasks   Task[]
+  budgets Budget[]
+}
+
+model Task {
+  id               String      @id @default(cuid())
+  projectId        String
+  project          Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workPackageId    String
+  workPackage      WorkPackage @relation(fields: [workPackageId], references: [id])
+  buildingId       String?
+  building         Building?   @relation(fields: [buildingId], references: [id])
+  code             String
+  name             String
+  description      String?
+  phase            String
+  plannedStartDate DateTime
+  plannedEndDate   DateTime
+  actualStartDate  DateTime?
+  actualEndDate    DateTime?
+  durationDays     Int
+  progressPct      Float       @default(0)
+  status           TaskStatus  @default(NOT_STARTED)
+  isCritical       Boolean     @default(false)
+  isMilestone      Boolean     @default(false)
+  floatDays        Int         @default(0)
+  crewSize         Int?
+  productivityRate Float?
+  quantityUnit     String?
+  quantity         Float?
+  notes            String?
+  sortOrder        Int
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  predecessors        Dependency[]         @relation("SuccessorTask")
+  successors          Dependency[]         @relation("PredecessorTask")
+  raciAssignments     RaciAssignment[]
+  progressUpdates     ProgressUpdate[]
+  resourceAllocations ResourceAllocation[]
+  shipmentTasks       ShipmentTask[]
+  comments            Comment[]
+}
+
+model Dependency {
+  id            String @id @default(cuid())
+  predecessorId String
+  predecessor   Task   @relation("PredecessorTask", fields: [predecessorId], references: [id], onDelete: Cascade)
+  successorId   String
+  successor     Task   @relation("SuccessorTask", fields: [successorId], references: [id], onDelete: Cascade)
+  type          String @default("FS")
+  lagDays       Int    @default(0)
+
+  @@unique([predecessorId, successorId])
+}
+
+// ─── PARTIES & RACI ───────────────────────────────────────────────
+
+model Party {
+  id           String    @id @default(cuid())
+  companyId    String?
+  company      Company?  @relation(fields: [companyId], references: [id])
+  name         String
+  type         PartyType
+  contactName  String?
+  contactEmail String?
+  contactPhone String?
+  country      String?
+  createdAt    DateTime  @default(now())
+
+  projectParties  ProjectParty[]
+  raciAssignments RaciAssignment[]
+  supplierRecords Supplier[]
+}
+
+model ProjectParty {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  partyId   String
+  party     Party   @relation(fields: [partyId], references: [id])
+  role      String?
+
+  @@unique([projectId, partyId])
+}
+
+model RaciAssignment {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  partyId   String?
+  party     Party?   @relation(fields: [partyId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  raciRole  RaciRole
+  createdAt DateTime @default(now())
+}
+
+// ─── RESOURCES ────────────────────────────────────────────────────
+
+model Resource {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  type      String
+  unit      String
+  unitCost  Float
+  currency  String   @default("USD")
+  createdAt DateTime @default(now())
+
+  allocations ResourceAllocation[]
+}
+
+model ResourceAllocation {
+  id         String   @id @default(cuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  resourceId String
+  resource   Resource @relation(fields: [resourceId], references: [id])
+  quantity   Float
+  units      String
+}
+
+// ─── LOGISTICS ────────────────────────────────────────────────────
+
+model Supplier {
+  id            String   @id @default(cuid())
+  partyId       String
+  party         Party    @relation(fields: [partyId], references: [id])
+  material      String
+  leadTimeDays  Int
+  moq           Float?
+  moqUnit       String?
+  countryOrigin String?
+  createdAt     DateTime @default(now())
+
+  shipments Shipment[]
+}
+
+model Material {
+  id           String    @id @default(cuid())
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name         String
+  spec         String?
+  unit         String
+  totalQty     Float
+  orderedQty   Float     @default(0)
+  deliveredQty Float     @default(0)
+  requiredDate DateTime?
+  supplierId   String?
+  unitCost     Float?
+  createdAt    DateTime  @default(now())
+
+  shipments ShipmentMaterial[]
+}
+
+model Shipment {
+  id               String         @id @default(cuid())
+  supplierId       String
+  supplier         Supplier       @relation(fields: [supplierId], references: [id])
+  orderDate        DateTime
+  expectedDelivery DateTime
+  actualDelivery   DateTime?
+  status           ShipmentStatus @default(ORDERED)
+  notes            String?
+  createdAt        DateTime       @default(now())
+
+  materials ShipmentMaterial[]
+  tasks     ShipmentTask[]
+}
+
+model ShipmentMaterial {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  materialId String
+  material   Material @relation(fields: [materialId], references: [id])
+  quantity   Float
+}
+
+model ShipmentTask {
+  id         String   @id @default(cuid())
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id])
+}
+
+// ─── BUDGET & COSTS ───────────────────────────────────────────────
+
+model Budget {
+  id            String       @id @default(cuid())
+  projectId     String
+  project       Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  workPackageId String?
+  workPackage   WorkPackage? @relation(fields: [workPackageId], references: [id])
+  name          String
+  estimatedCost Float
+  committedCost Float        @default(0)
+  actualCost    Float        @default(0)
+  forecastCost  Float        @default(0)
+  currency      String       @default("USD")
+  category      String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  costs Cost[]
+}
+
+model Cost {
+  id          String   @id @default(cuid())
+  budgetId    String
+  budget      Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  description String
+  amount      Float
+  type        String
+  date        DateTime
+  invoiceRef  String?
+  createdAt   DateTime @default(now())
+}
+
+// ─── PROGRESS ─────────────────────────────────────────────────────
+
+model ProgressUpdate {
+  id          String   @id @default(cuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  date        DateTime
+  progressPct Float
+  notes       String?
+  photoUrls   String[]
+  createdAt   DateTime @default(now())
+}
+
+// ─── MILESTONES ───────────────────────────────────────────────────
+
+model Milestone {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  plannedDate DateTime
+  actualDate  DateTime?
+  achieved    Boolean   @default(false)
+  description String?
+  createdAt   DateTime  @default(now())
+}
+
+// ─── RISKS ────────────────────────────────────────────────────────
+
+model Risk {
+  id          String    @id @default(cuid())
+  projectId   String
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  level       RiskLevel @default(MEDIUM)
+  probability Float
+  impact      Float
+  riskScore   Float
+  category    String?
+  owner       String?
+  mitigation  String?
+  status      String    @default("OPEN")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ─── DOCUMENTS ────────────────────────────────────────────────────
+
+model Document {
+  id         String   @id @default(cuid())
+  projectId  String
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name       String
+  type       String
+  url        String
+  uploadedBy String
+  createdAt  DateTime @default(now())
+}
+
+// ─── COMMENTS ─────────────────────────────────────────────────────
+
+model Comment {
+  id        String   @id @default(cuid())
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  body      String
+  createdAt DateTime @default(now())
+}
