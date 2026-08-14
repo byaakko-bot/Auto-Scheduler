@@ -10,7 +10,7 @@ function titleCase(s: string): string {
 }
 
 async function main() {
-  console.log("Seeding ConstructFlow demo data…");
+  console.log("Seeding Buildora demo data…");
 
   // Clean slate for the demo company.
   const existing = await db.company.findFirst({ where: { name: "Meridian Development Group" } });

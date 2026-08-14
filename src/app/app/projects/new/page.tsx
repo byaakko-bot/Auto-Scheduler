@@ -406,7 +406,7 @@ export default function NewProjectWizard() {
             )}
 
             <div className="rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
-              On submit, ConstructFlow generates the full work breakdown
+              On submit, Buildora generates the full work breakdown
               structure, computes the critical path, and assigns default RACI
               roles to every phase.
             </div>

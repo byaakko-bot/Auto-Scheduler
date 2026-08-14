@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ConstructFlow — Construction Schedule Platform",
+  title: "Buildora — Construction Schedule Platform",
   description:
     "Automatically generate realistic, dependency-aware construction schedules with critical path, RACI, and live delay propagation.",
 };

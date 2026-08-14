@@ -1,4 +1,4 @@
-# Deploying ConstructFlow
+# Deploying Buildora
 
 The app is production-ready for **Vercel** with a **Neon Postgres** database.
 A Neon database has already been provisioned and seeded for you.

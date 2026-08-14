@@ -26,7 +26,7 @@ export function Sidebar() {
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
           <CalendarRange className="h-4 w-4" />
         </div>
-        <span className="font-semibold tracking-tight">ConstructFlow</span>
+        <span className="font-semibold tracking-tight">Buildora</span>
       </Link>
       <nav className="flex-1 space-y-1 px-3 py-2">
         {nav.map((item) => {

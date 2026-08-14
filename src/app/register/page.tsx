@@ -9,7 +9,7 @@ export default function RegisterPage() {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white">
             <CalendarRange className="h-5 w-5" />
           </div>
-          <span className="text-lg font-semibold">ConstructFlow</span>
+          <span className="text-lg font-semibold">Buildora</span>
         </div>
         <h1 className="text-xl font-semibold text-slate-900">Create account</h1>
         <p className="mt-1 text-sm text-slate-500">

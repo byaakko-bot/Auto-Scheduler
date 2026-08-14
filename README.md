@@ -1,6 +1,6 @@
-# ConstructFlow — Construction Schedule Platform (MVP)
+# Buildora — Construction Schedule Platform (MVP)
 
-ConstructFlow generates realistic, dependency-aware construction schedules from a
+Buildora generates realistic, dependency-aware construction schedules from a
 handful of project parameters. A rules-based engine builds the work breakdown
 structure, computes task durations from crew productivity and procurement lead
 times, wires up FS/SS/FF dependencies, solves the **critical path** (forward +

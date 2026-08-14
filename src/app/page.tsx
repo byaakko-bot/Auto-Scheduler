@@ -50,7 +50,7 @@ export default function LandingPage() {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white">
             <CalendarRange className="h-5 w-5" />
           </div>
-          <span className="text-lg font-semibold tracking-tight">ConstructFlow</span>
+          <span className="text-lg font-semibold tracking-tight">Buildora</span>
         </div>
         <nav className="flex items-center gap-3">
           <Link
@@ -76,7 +76,7 @@ export default function LandingPage() {
           Construction schedules that build themselves.
         </h1>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-600">
-          ConstructFlow replaces manual scheduling in Excel and MS Project with a
+          Buildora replaces manual scheduling in Excel and MS Project with a
           dependency-aware engine that understands sequencing, crew productivity,
           procurement lead times, and the critical path.
         </p>
@@ -115,7 +115,7 @@ export default function LandingPage() {
 
       <footer className="border-t border-slate-200 py-8">
         <p className="text-center text-sm text-slate-400">
-          ConstructFlow · Construction Schedule Platform · MVP
+          Buildora · Construction Schedule Platform · MVP
         </p>
       </footer>
     </main>

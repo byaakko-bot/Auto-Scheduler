@@ -1,5 +1,5 @@
-// ConstructFlow — Prisma schema
-// Generated for the construction-scheduler MVP.
+// Buildora — Prisma schema
+// Generated for the Buildora MVP.
 
 generator client {
   provider = "prisma-client-js"

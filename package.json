@@ -1,8 +1,8 @@
 {
-  "name": "construction-scheduler",
+  "name": "buildora",
   "version": "1.0.0",
   "private": true,
-  "description": "ConstructFlow — rules-based construction schedule platform (MVP)",
+  "description": "Buildora — rules-based construction schedule platform (MVP)",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
