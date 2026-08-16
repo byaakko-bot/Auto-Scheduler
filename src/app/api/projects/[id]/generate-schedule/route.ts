@@ -1,6 +1,7 @@
+import { randomUUID } from "crypto";
 import { db } from "@/lib/prisma";
 import { ensureProjectParties, fail, handleError, ok } from "@/lib/api";
-import { ScheduleEngine } from "@/engine";
+import { CircularDependencyError, ScheduleEngine } from "@/engine";
 import { DEFAULT_PRODUCTIVITY } from "@/engine/constants";
 import { raciForPhase } from "@/engine/raciAssigner";
 import { titleCase } from "@/lib/utils";
@@ -40,46 +41,86 @@ export async function POST(
       constructionMethod: project.constructionMethod as ConstructionMethod,
       buildingType: project.buildingType as BuildingType,
       startDate: project.startDate,
+      targetEndDate: project.targetEndDate ?? undefined,
       workingDaysPerWeek: project.workingDaysPerWeek,
+      workingHoursPerDay: project.workingHoursPerDay,
       holidays: holidays.map((h) => h.date),
       permitWeeks,
+      nearCriticalThreshold: project.nearCriticalThresholdDays,
+      watchThreshold: project.watchThresholdDays,
     });
 
-    const schedule = engine.generate();
+    let schedule;
+    try {
+      schedule = engine.generate();
+    } catch (err) {
+      // A cyclic network has no valid solution. Surface the offending chain
+      // rather than persisting dates the engine cannot justify.
+      if (err instanceof CircularDependencyError) {
+        return fail(err.message, 422, { cycles: err.cycles });
+      }
+      throw err;
+    }
 
-    // Idempotent regeneration: clear any previously generated structure.
-    await db.dependency.deleteMany({
-      where: { predecessor: { projectId: project.id } },
-    });
-    await db.task.deleteMany({ where: { projectId: project.id } });
-    await db.workPackage.deleteMany({ where: { projectId: project.id } });
-
-    // One work package per distinct phase, ordered by first appearance.
+    // Pre-assign ids so tasks, dependencies and RACI rows can all be written
+    // with batched createMany instead of one round-trip per row.
     const phases: string[] = [];
     for (const t of schedule.tasks) {
       if (!phases.includes(t.phase)) phases.push(t.phase);
     }
     const phaseToWp: Record<string, string> = {};
-    for (let i = 0; i < phases.length; i++) {
-      const phase = phases[i];
-      const wp = await db.workPackage.create({
-        data: {
+    for (const phase of phases) phaseToWp[phase] = randomUUID();
+
+    const codeToTaskId: Record<string, string> = {};
+    for (const t of schedule.tasks) codeToTaskId[t.code] = randomUUID();
+
+    const partyMap = await ensureProjectParties(project.companyId, project.id);
+
+    const raciRows = schedule.tasks.flatMap((t) =>
+      raciForPhase(t.phase)
+        .filter((seed) => partyMap[seed.partyType])
+        .map((seed) => ({
+          taskId: codeToTaskId[t.code],
+          partyId: partyMap[seed.partyType],
+          raciRole: seed.raciRole,
+        }))
+    );
+
+    const dependencyRows = schedule.tasks.flatMap((t) =>
+      t.predecessors
+        .filter((p) => codeToTaskId[p.code])
+        .map((p) => ({
+          predecessorId: codeToTaskId[p.code],
+          successorId: codeToTaskId[t.code],
+          type: p.type,
+          lagDays: p.lag,
+        }))
+    );
+
+    await db.$transaction([
+      // Idempotent regeneration: clear any previously generated structure.
+      db.dependency.deleteMany({
+        where: { predecessor: { projectId: project.id } },
+      }),
+      db.task.deleteMany({ where: { projectId: project.id } }),
+      db.workPackage.deleteMany({ where: { projectId: project.id } }),
+      db.milestone.deleteMany({ where: { projectId: project.id } }),
+
+      db.workPackage.createMany({
+        data: phases.map((phase, i) => ({
+          id: phaseToWp[phase],
           projectId: project.id,
           code: String(i + 1),
           name: titleCase(phase),
           phase,
           sortOrder: i,
           color: schedule.tasks.find((t) => t.phase === phase)?.color ?? null,
-        },
-      });
-      phaseToWp[phase] = wp.id;
-    }
+        })),
+      }),
 
-    // Tasks
-    const codeToTaskId: Record<string, string> = {};
-    for (const t of schedule.tasks) {
-      const created = await db.task.create({
-        data: {
+      db.task.createMany({
+        data: schedule.tasks.map((t) => ({
+          id: codeToTaskId[t.code],
           projectId: project.id,
           workPackageId: phaseToWp[t.phase],
           code: t.code,
@@ -91,71 +132,45 @@ export async function POST(
           isCritical: t.isCritical,
           isMilestone: t.isMilestone,
           floatDays: t.floatDays,
+          freeFloatDays: t.freeFloatDays,
+          criticalityBand: t.band,
+          earlyStartOffset: t.earlyStartOffset,
+          earlyFinishOffset: t.earlyFinishOffset,
+          lateStartOffset: t.lateStartOffset,
+          lateFinishOffset: t.lateFinishOffset,
           crewSize,
           quantity: t.quantity ?? null,
           quantityUnit: t.quantityUnit ?? null,
           sortOrder: t.sortOrder,
-        },
-      });
-      codeToTaskId[t.code] = created.id;
-    }
+        })),
+      }),
 
-    // Dependencies
-    for (const t of schedule.tasks) {
-      for (const p of t.predecessors) {
-        const predId = codeToTaskId[p.code];
-        const succId = codeToTaskId[t.code];
-        if (!predId || !succId) continue;
-        await db.dependency.create({
-          data: {
-            predecessorId: predId,
-            successorId: succId,
-            type: p.type,
-            lagDays: p.lag,
-          },
-        });
-      }
-    }
+      db.dependency.createMany({ data: dependencyRows, skipDuplicates: true }),
+      db.raciAssignment.createMany({ data: raciRows }),
 
-    // RACI auto-assignment per task, based on phase defaults.
-    const partyMap = await ensureProjectParties(project.companyId, project.id);
-    for (const t of schedule.tasks) {
-      const seeds = raciForPhase(t.phase);
-      for (const seed of seeds) {
-        const partyId = partyMap[seed.partyType];
-        if (!partyId) continue;
-        await db.raciAssignment.create({
-          data: {
-            taskId: codeToTaskId[t.code],
-            partyId,
-            raciRole: seed.raciRole,
-          },
-        });
-      }
-    }
+      db.milestone.createMany({
+        data: schedule.tasks
+          .filter((x) => x.isMilestone)
+          .map((t) => ({
+            projectId: project.id,
+            name: t.name,
+            plannedDate: t.plannedStartDate,
+          })),
+      }),
 
-    // Milestones mirror the generated milestone tasks.
-    await db.milestone.deleteMany({ where: { projectId: project.id } });
-    for (const t of schedule.tasks.filter((x) => x.isMilestone)) {
-      await db.milestone.create({
-        data: {
-          projectId: project.id,
-          name: t.name,
-          plannedDate: t.plannedStartDate,
-        },
-      });
-    }
-
-    await db.project.update({
-      where: { id: project.id },
-      data: { targetEndDate: schedule.projectEndDate, status: "ACTIVE" },
-    });
+      db.project.update({
+        where: { id: project.id },
+        data: { status: "ACTIVE" },
+      }),
+    ]);
 
     return ok({
       taskCount: schedule.tasks.length,
       projectEndDate: schedule.projectEndDate,
       durationWorkingDays: schedule.projectDurationWorkingDays,
       criticalPathCount: schedule.criticalPathCodes.length,
+      criticalPaths: schedule.criticalPaths,
+      feasibility: schedule.feasibility,
     });
   } catch (err) {
     return handleError(err);

@@ -92,6 +92,34 @@ enum RiskLevel {
   CRITICAL
 }
 
+// Primavera/MS-Project date-constraint semantics.
+enum ConstraintType {
+  SNET // Start No Earlier Than
+  FNLT // Finish No Later Than
+  MSO  // Must Start On
+  MFO  // Must Finish On
+}
+
+// How close to critical an activity sits (§9). Not a binary flag.
+enum CriticalityBand {
+  CRITICAL
+  NEAR_CRITICAL
+  WATCH
+  NORMAL
+}
+
+enum BaselineStatus {
+  DRAFT
+  APPROVED
+  SUPERSEDED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
 // ─── USERS & COMPANIES ────────────────────────────────────────────
 
 model User {
@@ -157,6 +185,14 @@ model Project {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
+  // §9 — configurable float bands, in working days.
+  nearCriticalThresholdDays Int @default(5)
+  watchThresholdDays        Int @default(10)
+
+  // Default calendar applied to activities that do not name their own.
+  defaultCalendarId String?
+  defaultCalendar   Calendar? @relation("ProjectDefaultCalendar", fields: [defaultCalendarId], references: [id])
+
   members        ProjectMember[]
   buildings      Building[]
   workPackages   WorkPackage[]
@@ -169,6 +205,10 @@ model Project {
   publicHolidays PublicHoliday[]
   resources      Resource[]
   materials      Material[]
+  calendars      Calendar[]        @relation("ProjectCalendars")
+  baselines      Baseline[]
+  revisions      ScheduleRevision[]
+  auditLogs      AuditLog[]
 }
 
 model ProjectMember {
@@ -256,6 +296,30 @@ model Task {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
 
+  // ── CPM results ────────────────────────────────────────────────
+  // Persisted so that every date shown to a user can be traced back to the
+  // forward/backward pass that produced it, rather than being unexplainable.
+  earlyStartOffset  Int?
+  earlyFinishOffset Int?
+  lateStartOffset   Int?
+  lateFinishOffset  Int?
+  freeFloatDays     Int             @default(0)
+  criticalityBand   CriticalityBand @default(NORMAL)
+
+  // ── Date constraint (§34/§35) ──────────────────────────────────
+  constraintType ConstraintType?
+  constraintDate DateTime?
+
+  // ── Progress (§25/§26) ─────────────────────────────────────────
+  // % complete alone is not enough: 50% complete does not imply 50% of the
+  // duration remains, so remaining duration is tracked independently.
+  remainingDurationDays Int?
+  actualQuantity        Float?
+
+  // Per-activity calendar; falls back to the project default when unset.
+  calendarId String?
+  calendar   Calendar? @relation("TaskCalendar", fields: [calendarId], references: [id])
+
   predecessors        Dependency[]         @relation("SuccessorTask")
   successors          Dependency[]         @relation("PredecessorTask")
   raciAssignments     RaciAssignment[]
@@ -263,6 +327,11 @@ model Task {
   resourceAllocations ResourceAllocation[]
   shipmentTasks       ShipmentTask[]
   comments            Comment[]
+  baselineTasks       BaselineTask[]
+
+  @@unique([projectId, code])
+  @@index([projectId, sortOrder])
+  @@index([projectId, criticalityBand])
 }
 
 model Dependency {
@@ -331,6 +400,14 @@ model Resource {
   unitCost  Float
   currency  String   @default("USD")
   createdAt DateTime @default(now())
+
+  // §15 — how many of this resource can run concurrently. Used to detect the
+  // impossible overlapping assignments described in §14.
+  capacity Int @default(1)
+
+  // §10 — resources may work a different calendar from the project default.
+  calendarId String?
+  calendar   Calendar? @relation("ResourceCalendar", fields: [calendarId], references: [id])
 
   allocations ResourceAllocation[]
 }
@@ -504,6 +581,121 @@ model Document {
   url        String
   uploadedBy String
   createdAt  DateTime @default(now())
+}
+
+// ─── CALENDARS (§10) ──────────────────────────────────────────────
+
+// A named working calendar. `workingWeek` is a 7-slot mask where index 0 is
+// Sunday, so Mon–Fri, Mon–Sat, 4-day weeks and shift patterns are all
+// expressible. Several calendars can coexist per project and be attached to
+// individual activities or resources.
+model Calendar {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation("ProjectCalendars", fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  isDefault Boolean  @default(false)
+  // Index 0 = Sunday … 6 = Saturday.
+  workingWeek  Boolean[]
+  hoursPerDay  Float    @default(8)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  exceptions         CalendarException[]
+  tasks              Task[]              @relation("TaskCalendar")
+  defaultForProjects Project[]           @relation("ProjectDefaultCalendar")
+  resources          Resource[]          @relation("ResourceCalendar")
+
+  @@unique([projectId, name])
+}
+
+// Overrides the weekly pattern for a single date. `working = false` marks a
+// holiday or shutdown; `working = true` marks an added recovery day.
+model CalendarException {
+  id         String   @id @default(cuid())
+  calendarId String
+  calendar   Calendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  date       DateTime
+  working    Boolean  @default(false)
+  name       String?
+
+  @@unique([calendarId, date])
+}
+
+// ─── BASELINES (§23/§24) ──────────────────────────────────────────
+
+// A frozen snapshot of the schedule. Once approved it must never change
+// silently — variance is always measured against it.
+model Baseline {
+  id          String         @id @default(cuid())
+  projectId   String
+  project     Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  status      BaselineStatus @default(DRAFT)
+  approvedAt  DateTime?
+  approvedBy  String?
+  notes       String?
+  createdAt   DateTime       @default(now())
+
+  tasks BaselineTask[]
+
+  @@unique([projectId, name])
+}
+
+model BaselineTask {
+  id         String   @id @default(cuid())
+  baselineId String
+  baseline   Baseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  code          String
+  name          String
+  startDate     DateTime
+  endDate       DateTime
+  durationDays  Int
+  floatDays     Int      @default(0)
+  isCritical    Boolean  @default(false)
+
+  @@unique([baselineId, taskId])
+}
+
+// ─── SCHEDULE REVISIONS (§24) ─────────────────────────────────────
+
+model ScheduleRevision {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revisionNo  Int
+  author      String?
+  reason      String?
+  changeCount Int      @default(0)
+  approved    Boolean  @default(false)
+  approvedBy  String?
+  approvedAt  DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([projectId, revisionNo])
+}
+
+// ─── AUDIT TRAIL (§45) ────────────────────────────────────────────
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  projectId String
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String?
+  action    AuditAction
+  entity    String // "Task", "Dependency", "Baseline", …
+  entityId  String
+  field     String?
+  oldValue  String?
+  newValue  String?
+  reason    String?
+  createdAt DateTime    @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([entity, entityId])
 }
 
 // ─── COMMENTS ─────────────────────────────────────────────────────

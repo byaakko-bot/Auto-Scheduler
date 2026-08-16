@@ -97,9 +97,16 @@ export interface ProjectInputs {
   constructionMethod: ConstructionMethod;
   buildingType: BuildingType;
   startDate: Date;
+  /** Contractual completion date. Drives the CPM deadline and §35 feasibility. */
+  targetEndDate?: Date;
   workingDaysPerWeek: number; // 5 | 6 | 7
+  /** Explicit week mask (index 0 = Sunday). Overrides workingDaysPerWeek. */
+  workingWeek?: boolean[];
+  workingHoursPerDay?: number;
   holidays?: Date[];
   permitWeeks?: number;
+  nearCriticalThreshold?: number;
+  watchThreshold?: number;
 }
 
 export interface TaskWithDuration extends TaskTemplate {
@@ -107,16 +114,52 @@ export interface TaskWithDuration extends TaskTemplate {
   quantity?: number;
 }
 
+// Date constraints, using Primavera/MS-Project semantics.
+//   SNET — Start No Earlier Than    FNLT — Finish No Later Than
+//   MSO  — Must Start On            MFO  — Must Finish On
+export type ConstraintType = "SNET" | "FNLT" | "MSO" | "MFO";
+
+export interface ScheduleConstraint {
+  type: ConstraintType;
+  offset: number; // working-day offset from project start
+}
+
+// How close to critical an activity sits. §9 requires more than a binary flag.
+export type CriticalityBand =
+  | "CRITICAL"
+  | "NEAR_CRITICAL"
+  | "WATCH"
+  | "NORMAL";
+
 export interface ScheduleNode {
   taskId: string; // template code
   durationDays: number;
   predecessors: { taskId: string; type: DependencyType; lag: number }[];
+  constraint?: ScheduleConstraint;
   es: number; // early start (working-day offset)
   ef: number; // early finish
   ls: number; // late start
   lf: number; // late finish
-  float: number;
+  float: number; // total float
+  freeFloat: number; // slip available without moving any successor
   isCritical: boolean;
+  band: CriticalityBand;
+}
+
+export interface CpmOptions {
+  // Required project finish, as a working-day offset. When the network cannot
+  // meet it, total float goes negative rather than being clamped to zero.
+  deadline?: number;
+  nearCriticalThreshold?: number; // default 5 working days
+  watchThreshold?: number; // default 10 working days
+}
+
+export interface CpmResult {
+  nodes: ScheduleNode[];
+  projectDuration: number; // earliest achievable finish, in working days
+  deadline?: number;
+  isFeasible: boolean;
+  criticalPaths: string[][];
 }
 
 export interface GeneratedTask {
@@ -130,6 +173,12 @@ export interface GeneratedTask {
   isCritical: boolean;
   isMilestone: boolean;
   floatDays: number;
+  freeFloatDays: number;
+  band: CriticalityBand;
+  earlyStartOffset: number;
+  earlyFinishOffset: number;
+  lateStartOffset: number;
+  lateFinishOffset: number;
   sortOrder: number;
   color: string;
   quantity?: number;
@@ -137,9 +186,20 @@ export interface GeneratedTask {
   predecessors: TemplatePredecessor[];
 }
 
+/** §35 — is the requested completion date reachable, and if not, by how much? */
+export interface FeasibilityReport {
+  targetEndDate?: Date;
+  requiredWorkingDays: number;
+  availableWorkingDays?: number;
+  gapWorkingDays: number; // >0 means the target cannot be met
+  isFeasible: boolean;
+}
+
 export interface GeneratedSchedule {
   tasks: GeneratedTask[];
   projectDurationWorkingDays: number;
   projectEndDate: Date;
   criticalPathCodes: string[];
+  criticalPaths: string[][];
+  feasibility: FeasibilityReport;
 }

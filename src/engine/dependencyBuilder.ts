@@ -15,6 +15,8 @@ export function buildScheduleNodes(tasks: TaskWithDuration[]): ScheduleNode[] {
     ls: 0,
     lf: 0,
     float: 0,
+    freeFloat: 0,
     isCritical: false,
+    band: "NORMAL",
   }));
 }
