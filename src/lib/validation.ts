@@ -77,6 +77,11 @@ export const updateTaskSchema = z.object({
   plannedEndDate: z.string().optional(),
   actualStartDate: z.string().optional().nullable(),
   actualEndDate: z.string().optional().nullable(),
+  // §25 — remaining duration is reported independently of percent complete,
+  // because 50% complete does not imply 50% of the duration remains.
+  remainingDurationDays: z.number().int().nonnegative().optional().nullable(),
+  // §26 — quantity installed to date, for physical progress.
+  actualQuantity: z.number().nonnegative().optional().nullable(),
 });
 
 export const delayTaskSchema = z.object({
