@@ -239,6 +239,7 @@ model Project {
   revisions      ScheduleRevision[]
   auditLogs      AuditLog[]
   procurement    ProcurementPackage[]
+  scenarios      Scenario[]
 }
 
 model ProjectMember {
@@ -787,6 +788,44 @@ model ProcurementLeg {
   sequence  Int
 
   @@index([packageId, sequence])
+}
+
+// ─── SCENARIOS (§21) ──────────────────────────────────────────────
+
+// A what-if variant of the schedule. Changes are stored, never applied to the
+// live tasks — evaluating a scenario re-solves a copy of the network, so the
+// approved baseline is never disturbed.
+model Scenario {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  /// Cached result of the last evaluation, in working days.
+  finishShiftDays Int?
+  isFeasible      Boolean?
+  evaluatedAt     DateTime?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  changes ScenarioChange[]
+
+  @@unique([projectId, name])
+}
+
+model ScenarioChange {
+  id         String   @id @default(cuid())
+  scenarioId String
+  scenario   Scenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  /// DURATION_DELTA | DURATION_SET | LAG_SET | DEPENDENCY_TYPE | CONSTRAINT
+  kind            String
+  taskCode        String
+  predecessorCode String?
+  value           Float
+  dependencyType  String?
+  constraintType  String?
+  note            String?
 }
 
 // ─── COMMENTS ─────────────────────────────────────────────────────
