@@ -61,6 +61,14 @@ export function bindingFor(
 ): ActivityRateBinding | undefined {
   const industrial = INDUSTRIAL_TYPES.has(buildingType ?? "");
 
+  // A clad shed is sheeted, not walled: composite panels fixed to steel rails
+  // run roughly six times faster than blockwork.
+  if (activityCode === "EN1" && industrial) {
+    return { rateCode: "CLADDING", quantityCode: "EXTERNAL_WALLS" };
+  }
+  if (activityCode === "R1" && industrial) {
+    return { rateCode: "ROOF_SHEETING", quantityCode: "ROOFING" };
+  }
   if (activityCode === "EN1") {
     return ENVELOPE_BY_METHOD[method] ?? BASE_BINDINGS.EN1;
   }

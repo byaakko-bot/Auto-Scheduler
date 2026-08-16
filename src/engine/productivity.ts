@@ -120,6 +120,8 @@ export const DEFAULT_RATES: ProductivityRate[] = [
   { code: "AAC_BLOCK", name: "AAC block walling", unit: "m2", crewSize: 4, outputPerDay: 40, basis: "CREW" },
   { code: "AAC_PANEL", name: "AAC panel installation", unit: "m2", crewSize: 4, outputPerDay: 80, basis: "CREW" },
   { code: "PRECAST_ERECT", name: "Precast panel erection", unit: "m2", crewSize: 5, outputPerDay: 120, basis: "CREW" },
+  { code: "CLADDING", name: "Insulated panel cladding", unit: "m2", crewSize: 4, outputPerDay: 150, basis: "CREW", source: "Composite panels to steel rails" },
+  { code: "ROOF_SHEETING", name: "Profiled roof sheeting", unit: "m2", crewSize: 4, outputPerDay: 300, basis: "CREW", source: "Large-span industrial roof" },
   { code: "STEEL_ERECT", name: "Structural steel erection", unit: "ton", crewSize: 5, outputPerDay: 8, basis: "CREW" },
 
   { code: "ROOFING", name: "Roof covering", unit: "m2", crewSize: 4, outputPerDay: 80, basis: "CREW" },
