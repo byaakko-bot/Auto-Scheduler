@@ -92,7 +92,13 @@ export interface ProjectInputs {
   numberOfFloors: number;
   numberOfUnits: number;
   numberOfBasements: number;
+  /** Separate blocks on the site. Drives per-building facade and perimeter. */
+  numberOfBuildings?: number;
   crewSize: number;
+  /** Number of crews assigned to quantity-driven trades (§11/§15). */
+  crews?: number;
+  /** Project-specific productivity rates overriding the default library. */
+  productivityOverrides?: import("./productivity").ProductivityRate[];
   productivityRates: ProductivityRates;
   constructionMethod: ConstructionMethod;
   buildingType: BuildingType;
@@ -112,6 +118,12 @@ export interface ProjectInputs {
 export interface TaskWithDuration extends TaskTemplate {
   durationDays: number;
   quantity?: number;
+  /** How the duration was derived — shown to the user so a date is defensible. */
+  durationBasis?: string;
+  /** How the quantity was measured. */
+  quantityDerivation?: string;
+  /** Productivity rate used, or undefined when none is configured. */
+  productivityCode?: string;
 }
 
 // Date constraints, using Primavera/MS-Project semantics.
@@ -183,6 +195,9 @@ export interface GeneratedTask {
   color: string;
   quantity?: number;
   quantityUnit?: string;
+  durationBasis?: string;
+  quantityDerivation?: string;
+  productivityCode?: string;
   predecessors: TemplatePredecessor[];
 }
 

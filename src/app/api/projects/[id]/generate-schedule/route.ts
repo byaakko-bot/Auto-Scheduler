@@ -31,12 +31,22 @@ export async function POST(
       where: { projectId: project.id },
     });
 
+    // Separate blocks drive facade quantity: eleven small buildings have far
+    // more external wall than one block of the same total area.
+    const buildingCount = await db.building.count({
+      where: { projectId: project.id },
+    });
+    const numberOfBuildings = body.numberOfBuildings ?? Math.max(buildingCount, 1);
+    const crews: number = body.crews ?? 1;
+
     const engine = new ScheduleEngine({
       totalAreaSqm: project.totalAreaSqm,
       numberOfFloors: project.numberOfFloors,
       numberOfUnits: project.numberOfUnits ?? 1,
       numberOfBasements: project.numberOfBasements,
+      numberOfBuildings,
       crewSize,
+      crews,
       productivityRates,
       constructionMethod: project.constructionMethod as ConstructionMethod,
       buildingType: project.buildingType as BuildingType,
@@ -141,6 +151,7 @@ export async function POST(
           crewSize,
           quantity: t.quantity ?? null,
           quantityUnit: t.quantityUnit ?? null,
+          notes: t.durationBasis ?? null,
           sortOrder: t.sortOrder,
         })),
       }),

@@ -94,6 +94,9 @@ export class ScheduleEngine {
         color: phaseColor(t.phase),
         quantity: t.quantity,
         quantityUnit: t.quantityUnit,
+        durationBasis: t.durationBasis,
+        quantityDerivation: t.quantityDerivation,
+        productivityCode: t.productivityCode,
         predecessors: t.predecessors,
       };
     });

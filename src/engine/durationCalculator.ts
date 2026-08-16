@@ -1,4 +1,7 @@
+import { bindingFor } from "./activityRates";
 import { METHOD_MODIFIERS } from "./constants";
+import { buildRateLookup, durationFor } from "./productivity";
+import { takeoff } from "./quantities";
 import type {
   DurationFormula,
   ProjectInputs,
@@ -202,20 +205,69 @@ function computeQuantity(
   }
 }
 
+/**
+ * Resolves durations for every activity.
+ *
+ * Physical trades are driven by quantity ÷ productivity (§13), so changing a
+ * quantity or crew count re-drives the date. Activities that are genuinely
+ * lead-time or approval driven — design, permits, procurement, inspections —
+ * keep their formula, because no quantity governs them.
+ */
 export function calculateTaskDurations(
   template: TaskTemplate[],
   inputs: ProjectInputs
 ): TaskWithDuration[] {
+  const quantities = takeoff({
+    grossFloorAreaSqm: inputs.totalAreaSqm,
+    numberOfFloors: inputs.numberOfFloors,
+    numberOfBuildings: inputs.numberOfBuildings ?? 1,
+    numberOfUnits: inputs.numberOfUnits,
+    numberOfBasements: inputs.numberOfBasements,
+  });
+  const lookup = buildRateLookup(inputs.productivityOverrides);
+  const crews = Math.max(inputs.crews ?? 1, 1);
+
   return template.map((task) => {
     if (task.isMilestone) {
       return { ...task, durationDays: 0, quantity: undefined };
     }
+
+    const binding = bindingFor(task.code, inputs.constructionMethod);
+    if (binding) {
+      const rate = lookup(binding.rateCode);
+      const item = quantities.items.get(binding.quantityCode ?? binding.rateCode);
+
+      if (rate && item) {
+        const result = durationFor(item.quantity, rate, { crews });
+        return {
+          ...task,
+          durationDays: Math.max(result.durationDays, task.minDays ?? 1),
+          quantity: Math.round(item.quantity),
+          quantityUnit: item.unit,
+          durationBasis: result.explanation,
+          quantityDerivation: item.derivation,
+          productivityCode: rate.code,
+        };
+      }
+
+      // §42 — never invent a rate. Fall through to the formula and mark the
+      // activity so the UI can show "productivity not configured".
+      const raw = computeDuration(task.durationFormula, inputs, task);
+      return {
+        ...task,
+        durationDays: Math.max(raw, task.minDays ?? 1),
+        quantity: computeQuantity(task, inputs),
+        durationBasis: `Productivity not configured for ${binding.rateCode} — fell back to a parametric estimate`,
+        productivityCode: undefined,
+      };
+    }
+
     const raw = computeDuration(task.durationFormula, inputs, task);
-    const durationDays = Math.max(raw, task.minDays ?? 1);
     return {
       ...task,
-      durationDays,
+      durationDays: Math.max(raw, task.minDays ?? 1),
       quantity: computeQuantity(task, inputs),
+      durationBasis: "Lead-time / approval driven; not quantity based",
     };
   });
 }
