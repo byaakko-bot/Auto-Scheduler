@@ -113,7 +113,8 @@ export const DEFAULT_RATES: ProductivityRate[] = [
   { code: "FORMWORK", name: "Formwork erect/strike", unit: "m2", crewSize: 6, outputPerDay: 60, basis: "CREW" },
   { code: "CONCRETE_FOUND", name: "Foundation concrete", unit: "m3", crewSize: 6, outputPerDay: 30, basis: "CREW" },
   { code: "CONCRETE_SLAB", name: "Suspended slab concrete", unit: "m3", crewSize: 8, outputPerDay: 80, basis: "CREW" },
-  { code: "WATERPROOFING", name: "Tanking / waterproofing", unit: "m2", crewSize: 3, outputPerDay: 120, basis: "CREW" },
+  { code: "WATERPROOFING", name: "Tanking / waterproofing", unit: "m2", crewSize: 3, outputPerDay: 120, basis: "CREW", source: "Applied tanking to retaining walls" },
+  { code: "SLAB_MEMBRANE", name: "Under-slab damp-proof membrane", unit: "m2", crewSize: 3, outputPerDay: 800, basis: "CREW", source: "Sheet DPM laid over blinding" },
 
   { code: "MASONRY_BLOCK", name: "Blockwork masonry", unit: "m2", crewSize: 4, outputPerDay: 25, basis: "CREW" },
   { code: "AAC_BLOCK", name: "AAC block walling", unit: "m2", crewSize: 4, outputPerDay: 40, basis: "CREW" },
@@ -131,6 +132,7 @@ export const DEFAULT_RATES: ProductivityRate[] = [
   { code: "PARTITIONS", name: "Internal partitions", unit: "m2", crewSize: 4, outputPerDay: 45, basis: "CREW" },
   { code: "PLASTER", name: "Plastering", unit: "m2", crewSize: 4, outputPerDay: 60, basis: "CREW" },
   { code: "SCREED", name: "Floor screed", unit: "m2", crewSize: 4, outputPerDay: 120, basis: "CREW" },
+  { code: "INDUSTRIAL_SLAB", name: "Power-floated industrial slab", unit: "m2", crewSize: 8, outputPerDay: 700, basis: "CREW", source: "Laser screed, large-bay pour" },
   { code: "TILING", name: "Tiling", unit: "m2", crewSize: 4, outputPerDay: 35, basis: "CREW" },
   { code: "PAINTING", name: "Painting", unit: "m2", crewSize: 3, outputPerDay: 150, basis: "CREW" },
   { code: "JOINERY", name: "Joinery / fit-out", unit: "m2", crewSize: 4, outputPerDay: 40, basis: "CREW" },

@@ -223,6 +223,7 @@ export function calculateTaskDurations(
     numberOfBuildings: inputs.numberOfBuildings ?? 1,
     numberOfUnits: inputs.numberOfUnits,
     numberOfBasements: inputs.numberOfBasements,
+    buildingType: inputs.buildingType,
   });
   const lookup = buildRateLookup(inputs.productivityOverrides);
   const crews = Math.max(inputs.crews ?? 1, 1);
@@ -232,7 +233,11 @@ export function calculateTaskDurations(
       return { ...task, durationDays: 0, quantity: undefined };
     }
 
-    const binding = bindingFor(task.code, inputs.constructionMethod);
+    const binding = bindingFor(
+      task.code,
+      inputs.constructionMethod,
+      inputs.buildingType
+    );
     if (binding) {
       const rate = lookup(binding.rateCode);
       const item = quantities.items.get(binding.quantityCode ?? binding.rateCode);

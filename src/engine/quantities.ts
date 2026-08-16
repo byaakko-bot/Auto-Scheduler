@@ -14,12 +14,102 @@ export interface GeometryInputs {
   numberOfBuildings: number;
   numberOfUnits: number;
   numberOfBasements: number;
+  /** Drives the quantity profile. A warehouse is not a block of flats. */
+  buildingType?: string;
   /** Storey height, floor to floor. */
   floorHeightM?: number;
   /** Plan aspect ratio (length:width). 1 = square. */
   aspectRatio?: number;
   /** Excavation depth per basement level. */
   basementDepthM?: number;
+}
+
+/**
+ * Per-building-type quantity ratios.
+ *
+ * Applying residential ratios to an industrial shed is the single largest
+ * source of nonsense in a generated programme: it invents tens of thousands
+ * of square metres of plaster, partitions and joinery that do not exist in a
+ * clad steel portal frame.
+ */
+export interface BuildingProfile {
+  floorHeightM: number;
+  aspectRatio: number;
+  /** Internal partition area per m² GFA. */
+  partitionM2PerSqm: number;
+  /** Proportion of GFA receiving a finished ceiling. */
+  ceilingRatio: number;
+  /** Whether internal faces are wet-plastered at all. */
+  plasterApplies: boolean;
+  /** Glazing as a fraction of external wall area. */
+  glazingRatio: number;
+  /** Structural concrete per m² GFA. */
+  concreteM3PerSqm: number;
+  /** Foundation concrete per m² of footprint. */
+  foundationM3PerSqm: number;
+  /** Fraction of GFA receiving tiling. */
+  tilingRatio: number;
+  /** Fraction of GFA receiving joinery/fit-out. */
+  joineryRatio: number;
+  /** Fraction of GFA that is fitted-out office within an industrial shell. */
+  fitOutFraction: number;
+}
+
+const RESIDENTIAL: BuildingProfile = {
+  floorHeightM: 3.0,
+  aspectRatio: 1.5,
+  partitionM2PerSqm: 0.85,
+  ceilingRatio: 1.0,
+  plasterApplies: true,
+  glazingRatio: 0.18,
+  concreteM3PerSqm: 0.28,
+  foundationM3PerSqm: 0.35,
+  tilingRatio: 0.25,
+  joineryRatio: 1.0,
+  fitOutFraction: 1.0,
+};
+
+const OFFICE: BuildingProfile = {
+  ...RESIDENTIAL,
+  floorHeightM: 3.6,
+  partitionM2PerSqm: 0.45,
+  ceilingRatio: 0.95,
+  glazingRatio: 0.4,
+  tilingRatio: 0.08,
+  joineryRatio: 0.35,
+};
+
+// A clad steel or precast shed: tall, open-span, minimal wet trades. Only a
+// small office/welfare block receives partitions, plaster and joinery.
+const INDUSTRIAL: BuildingProfile = {
+  floorHeightM: 8.0,
+  aspectRatio: 1.6,
+  partitionM2PerSqm: 0.06,
+  ceilingRatio: 0.08,
+  plasterApplies: false,
+  glazingRatio: 0.05,
+  concreteM3PerSqm: 0.14,
+  foundationM3PerSqm: 0.22,
+  tilingRatio: 0.02,
+  joineryRatio: 0.08,
+  fitOutFraction: 0.08,
+};
+
+const PROFILES: Record<string, BuildingProfile> = {
+  RESIDENTIAL_APARTMENT: RESIDENTIAL,
+  RESIDENTIAL_HOUSE: { ...RESIDENTIAL, floorHeightM: 2.7, glazingRatio: 0.16 },
+  COMMERCIAL_OFFICE: OFFICE,
+  COMMERCIAL_RETAIL: { ...OFFICE, partitionM2PerSqm: 0.25, glazingRatio: 0.45 },
+  INDUSTRIAL_WAREHOUSE: INDUSTRIAL,
+  MIXED_USE: { ...RESIDENTIAL, glazingRatio: 0.28 },
+  HOSPITALITY: { ...RESIDENTIAL, partitionM2PerSqm: 1.0, tilingRatio: 0.35 },
+  HEALTHCARE: { ...OFFICE, partitionM2PerSqm: 0.9, tilingRatio: 0.3 },
+  EDUCATION: { ...OFFICE, partitionM2PerSqm: 0.6 },
+  INFRASTRUCTURE: { ...INDUSTRIAL, joineryRatio: 0.02, fitOutFraction: 0.02 },
+};
+
+export function profileFor(buildingType?: string): BuildingProfile {
+  return PROFILES[buildingType ?? ""] ?? RESIDENTIAL;
 }
 
 export interface QuantityItem {
@@ -65,8 +155,9 @@ function perimeterOf(areaSqm: number, aspectRatio: number): number {
 }
 
 export function takeoff(inputs: GeometryInputs): QuantityTakeoff {
-  const floorHeight = inputs.floorHeightM ?? DEFAULTS.floorHeightM;
-  const aspect = inputs.aspectRatio ?? DEFAULTS.aspectRatio;
+  const profile = profileFor(inputs.buildingType);
+  const floorHeight = inputs.floorHeightM ?? profile.floorHeightM;
+  const aspect = inputs.aspectRatio ?? profile.aspectRatio;
   const basementDepth = inputs.basementDepthM ?? DEFAULTS.basementDepthM;
 
   const buildings = Math.max(inputs.numberOfBuildings, 1);
@@ -81,7 +172,7 @@ export function takeoff(inputs: GeometryInputs): QuantityTakeoff {
 
   const totalFootprint = footprint * buildings;
   const externalWallArea = perimeter * floorHeight * floors * buildings;
-  const glazedArea = externalWallArea * DEFAULTS.glazingRatio;
+  const glazedArea = externalWallArea * profile.glazingRatio;
   const solidWallArea = externalWallArea - glazedArea;
 
   const excavationVol =
@@ -90,15 +181,17 @@ export function takeoff(inputs: GeometryInputs): QuantityTakeoff {
       ? basementDepth * inputs.numberOfBasements
       : 1.2); // strip/pad foundations still need dig
 
-  const foundationConcrete = totalFootprint * DEFAULTS.foundationM3PerSqm;
-  const superstructureConcrete = gfa * DEFAULTS.concreteM3PerSqm;
+  const foundationConcrete = totalFootprint * profile.foundationM3PerSqm;
+  const superstructureConcrete = gfa * profile.concreteM3PerSqm;
   const totalConcrete = foundationConcrete + superstructureConcrete;
 
-  const partitionArea = gfa * DEFAULTS.partitionM2PerSqm;
-  // Plaster covers both faces of partitions, inner face of external walls,
-  // and ceilings.
-  const plasterArea =
-    partitionArea * 2 + solidWallArea + gfa * DEFAULTS.ceilingRatio;
+  const partitionArea = gfa * profile.partitionM2PerSqm;
+  // Plaster covers both faces of partitions, the inner face of external walls
+  // and ceilings — but only where the building is wet-finished at all. A clad
+  // industrial shed has an internal lining, not 36,000 m² of plaster.
+  const plasterArea = profile.plasterApplies
+    ? partitionArea * 2 + solidWallArea + gfa * profile.ceilingRatio
+    : partitionArea * 2 + gfa * profile.ceilingRatio;
   const roofArea = totalFootprint * 1.15; // pitch/overhang allowance
 
   const items: QuantityItem[] = [
@@ -107,7 +200,20 @@ export function takeoff(inputs: GeometryInputs): QuantityTakeoff {
     { code: "CONCRETE_SLAB", quantity: superstructureConcrete, unit: "m3", derivation: `${Math.round(gfa)} m² GFA × ${DEFAULTS.concreteM3PerSqm} m³/m²` },
     { code: "REBAR", quantity: totalConcrete * DEFAULTS.rebarTonPerM3, unit: "ton", derivation: `${Math.round(totalConcrete)} m³ concrete × ${DEFAULTS.rebarTonPerM3} t/m³` },
     { code: "FORMWORK", quantity: superstructureConcrete * DEFAULTS.formworkM2PerM3, unit: "m2", derivation: `${Math.round(superstructureConcrete)} m³ × ${DEFAULTS.formworkM2PerM3} m²/m³` },
-    { code: "WATERPROOFING", quantity: totalFootprint * 1.3, unit: "m2", derivation: `${Math.round(totalFootprint)} m² footprint × 1.3` },
+    // With no basement this is a damp-proof membrane under the slab, not full
+    // tanking of retaining walls.
+    {
+      code: "WATERPROOFING",
+      quantity:
+        inputs.numberOfBasements > 0
+          ? totalFootprint + perimeter * basementDepth * inputs.numberOfBasements * buildings
+          : totalFootprint * 1.05,
+      unit: "m2",
+      derivation:
+        inputs.numberOfBasements > 0
+          ? `slab ${Math.round(totalFootprint)} m² + ${inputs.numberOfBasements} basement wall(s)`
+          : `${Math.round(totalFootprint)} m² slab DPM (no basement)`,
+    },
 
     { code: "EXTERNAL_WALLS", quantity: solidWallArea, unit: "m2", derivation: `${Math.round(perimeter)} m perimeter × ${floorHeight} m × ${floors} floors × ${buildings} building(s), less ${Math.round(DEFAULTS.glazingRatio * 100)}% glazing` },
     { code: "FACADE", quantity: solidWallArea, unit: "m2", derivation: "external solid wall area" },
@@ -115,13 +221,13 @@ export function takeoff(inputs: GeometryInputs): QuantityTakeoff {
     { code: "WINDOWS", quantity: Math.ceil(glazedArea / DEFAULTS.windowAreaSqm), unit: "ea", derivation: `${Math.round(glazedArea)} m² glazing ÷ ${DEFAULTS.windowAreaSqm} m² per unit` },
 
     { code: "MEP_ROUGH", quantity: gfa, unit: "m2", derivation: `${Math.round(gfa)} m² GFA` },
-    { code: "MEP_FINAL", quantity: gfa, unit: "m2", derivation: `${Math.round(gfa)} m² GFA` },
-    { code: "PARTITIONS", quantity: partitionArea, unit: "m2", derivation: `${Math.round(gfa)} m² GFA × ${DEFAULTS.partitionM2PerSqm}` },
-    { code: "PLASTER", quantity: plasterArea, unit: "m2", derivation: `partitions both faces + external inner face + ceilings` },
+    { code: "MEP_FINAL", quantity: Math.max(gfa * profile.fitOutFraction, 1), unit: "m2", derivation: `${Math.round(gfa)} m² GFA × ${profile.fitOutFraction} fit-out fraction` },
+    { code: "PARTITIONS", quantity: Math.max(partitionArea, 1), unit: "m2", derivation: `${Math.round(gfa)} m² GFA × ${profile.partitionM2PerSqm}` },
+    { code: "PLASTER", quantity: Math.max(plasterArea, 1), unit: "m2", derivation: profile.plasterApplies ? "partitions both faces + external inner face + ceilings" : "fitted-out areas only (shell is clad, not plastered)" },
     { code: "SCREED", quantity: gfa, unit: "m2", derivation: `${Math.round(gfa)} m² GFA` },
-    { code: "TILING", quantity: gfa * 0.25, unit: "m2", derivation: `${Math.round(gfa)} m² GFA × 0.25 (wet areas)` },
-    { code: "PAINTING", quantity: plasterArea, unit: "m2", derivation: "plastered area" },
-    { code: "JOINERY", quantity: gfa, unit: "m2", derivation: `${Math.round(gfa)} m² GFA` },
+    { code: "TILING", quantity: Math.max(gfa * profile.tilingRatio, 1), unit: "m2", derivation: `${Math.round(gfa)} m² GFA × ${profile.tilingRatio} (wet areas)` },
+    { code: "PAINTING", quantity: Math.max(plasterArea, 1), unit: "m2", derivation: profile.plasterApplies ? "plastered area" : "lined/fitted-out area only" },
+    { code: "JOINERY", quantity: Math.max(gfa * profile.joineryRatio, 1), unit: "m2", derivation: `${Math.round(gfa)} m² GFA × ${profile.joineryRatio} fit-out fraction` },
     { code: "EXTERNAL_WORKS", quantity: totalFootprint * 0.6, unit: "m2", derivation: `${Math.round(totalFootprint)} m² footprint × 0.6` },
 
     { code: "AAC_PANEL", quantity: solidWallArea, unit: "m2", derivation: "external solid wall area" },
@@ -134,9 +240,13 @@ export function takeoff(inputs: GeometryInputs): QuantityTakeoff {
   return {
     items: new Map(items.map((i) => [i.code, i])),
     assumptions: [
+      `Quantity profile: ${inputs.buildingType ?? "RESIDENTIAL_APARTMENT (default)"}`,
       `Storey height ${floorHeight} m`,
       `Plan aspect ratio ${aspect}:1`,
-      `Glazing ${Math.round(DEFAULTS.glazingRatio * 100)}% of external wall`,
+      `Glazing ${Math.round(profile.glazingRatio * 100)}% of external wall`,
+      profile.plasterApplies
+        ? "Internal faces wet-plastered"
+        : `Shell is clad/lined; wet finishes limited to ${Math.round(profile.fitOutFraction * 100)}% fitted-out area`,
       `${buildings} building(s) of ${Math.round(gfaPerBuilding)} m² over ${floors} floor(s)`,
       `Footprint ${Math.round(footprint)} m², perimeter ${Math.round(perimeter)} m per building`,
     ],

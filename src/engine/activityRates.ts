@@ -52,15 +52,29 @@ const STRUCTURE_BY_METHOD: Partial<Record<ConstructionMethod, ActivityRateBindin
   PRECAST_CONCRETE: { rateCode: "PRECAST_ERECT", quantityCode: "EXTERNAL_WALLS" },
 };
 
+const INDUSTRIAL_TYPES = new Set(["INDUSTRIAL_WAREHOUSE", "INFRASTRUCTURE"]);
+
 export function bindingFor(
   activityCode: string,
-  method: ConstructionMethod
+  method: ConstructionMethod,
+  buildingType?: string
 ): ActivityRateBinding | undefined {
+  const industrial = INDUSTRIAL_TYPES.has(buildingType ?? "");
+
   if (activityCode === "EN1") {
     return ENVELOPE_BY_METHOD[method] ?? BASE_BINDINGS.EN1;
   }
   if (activityCode === "ST1" && STRUCTURE_BY_METHOD[method]) {
     return STRUCTURE_BY_METHOD[method];
+  }
+  // A warehouse floor is a large-bay laser-screed pour, not a screed gang
+  // working room by room — roughly six times the daily output.
+  if (activityCode === "SC1" && industrial) {
+    return { rateCode: "INDUSTRIAL_SLAB", quantityCode: "SCREED" };
+  }
+  // Sheet membrane rolled out over a slab, not applied tanking on walls.
+  if (activityCode === "F3" && industrial) {
+    return { rateCode: "SLAB_MEMBRANE", quantityCode: "WATERPROOFING" };
   }
   return BASE_BINDINGS[activityCode];
 }
