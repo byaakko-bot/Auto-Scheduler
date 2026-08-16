@@ -120,6 +120,35 @@ enum AuditAction {
   DELETE
 }
 
+enum TransportMode {
+  ROAD
+  SEA
+  RAIL
+  AIR
+  MULTIMODAL
+}
+
+// Stages of the order-to-site chain (§18).
+enum ProcurementLegKind {
+  APPROVAL
+  PURCHASE_ORDER
+  PRODUCTION
+  LOADING
+  TRANSIT
+  CUSTOMS
+  DELIVERY
+}
+
+enum ProcurementStatus {
+  PLANNED
+  ORDERED
+  IN_PRODUCTION
+  IN_TRANSIT
+  CUSTOMS
+  DELIVERED
+  CANCELLED
+}
+
 // ─── USERS & COMPANIES ────────────────────────────────────────────
 
 model User {
@@ -209,6 +238,7 @@ model Project {
   baselines      Baseline[]
   revisions      ScheduleRevision[]
   auditLogs      AuditLog[]
+  procurement    ProcurementPackage[]
 }
 
 model ProjectMember {
@@ -328,6 +358,7 @@ model Task {
   shipmentTasks       ShipmentTask[]
   comments            Comment[]
   baselineTasks       BaselineTask[]
+  procurement         ProcurementPackage[] @relation("TaskProcurement")
 
   @@unique([projectId, code])
   @@index([projectId, sortOrder])
@@ -436,6 +467,7 @@ model Supplier {
   createdAt     DateTime @default(now())
 
   shipments Shipment[]
+  procurementPackages ProcurementPackage[]
 }
 
 model Material {
@@ -696,6 +728,65 @@ model AuditLog {
 
   @@index([projectId, createdAt])
   @@index([entity, entityId])
+}
+
+// ─── PROCUREMENT & LOGISTICS (§16–§18) ────────────────────────────
+
+// A material package tied to the activity that consumes it. The required-on-
+// site date is NOT stored: it is the consuming task's start date, so it moves
+// automatically whenever the schedule moves.
+model ProcurementPackage {
+  id        String  @id @default(cuid())
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  code      String
+  material  String
+  spec      String?
+
+  supplierId String?
+  supplier   Supplier? @relation(fields: [supplierId], references: [id])
+
+  // Logistics context (§18)
+  origin        String?
+  destination   String?
+  transportMode TransportMode?
+
+  /// Activity that needs the material on site.
+  consumingTaskId String?
+  consumingTask   Task?   @relation("TaskProcurement", fields: [consumingTaskId], references: [id])
+
+  /// Contingency held before the required-on-site date, in calendar days.
+  bufferDays Int @default(0)
+
+  /// Confirmed or forecast arrival. Null means genuinely unknown, not zero.
+  currentEtaDate DateTime?
+  orderedDate    DateTime?
+
+  status    ProcurementStatus @default(PLANNED)
+  quantity  Float?
+  unit      String?
+  notes     String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  legs ProcurementLeg[]
+
+  @@unique([projectId, code])
+  @@index([projectId, status])
+}
+
+// One stage of the chain. Durations are CALENDAR days — freight does not
+// observe the site working week.
+model ProcurementLeg {
+  id        String             @id @default(cuid())
+  packageId String
+  package   ProcurementPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  kind      ProcurementLegKind
+  name      String
+  days      Int
+  sequence  Int
+
+  @@index([packageId, sequence])
 }
 
 // ─── COMMENTS ─────────────────────────────────────────────────────
