@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { db } from "@/lib/prisma";
 import { ensureProjectParties, fail, handleError, ok } from "@/lib/api";
 import { CircularDependencyError, ScheduleEngine } from "@/engine";
+import { generateWithinTarget } from "@/engine/fit";
 import { DEFAULT_PRODUCTIVITY } from "@/engine/constants";
 import { raciForPhase } from "@/engine/raciAssigner";
 import { titleCase } from "@/lib/utils";
@@ -57,7 +58,14 @@ export async function POST(
     const numberOfBuildings = body.numberOfBuildings ?? Math.max(buildingCount, 1);
     const crews: number = body.crews ?? 1;
 
-    const engine = new ScheduleEngine({
+    // When a target date is set, default to fitting the schedule inside it by
+    // resourcing the work rather than reporting an overrun. Durations are never
+    // compressed to make the date — crews are added until it fits, or the
+    // response says plainly that it cannot.
+    const fitToTarget =
+      body.fitToTarget !== false && project.targetEndDate !== null;
+
+    const engineInputs = {
       totalAreaSqm: project.totalAreaSqm,
       numberOfFloors: project.numberOfFloors,
       numberOfUnits: project.numberOfUnits ?? 1,
@@ -76,11 +84,20 @@ export async function POST(
       permitWeeks,
       nearCriticalThreshold: project.nearCriticalThresholdDays,
       watchThreshold: project.watchThresholdDays,
-    });
+    };
 
     let schedule;
+    let fit: ReturnType<typeof generateWithinTarget> | null = null;
     try {
-      schedule = engine.generate();
+      if (fitToTarget) {
+        fit = generateWithinTarget(engineInputs, {
+          maxCrews: body.maxCrews ?? 8,
+          minCrews: crews,
+        });
+        schedule = fit.schedule;
+      } else {
+        schedule = new ScheduleEngine(engineInputs).generate();
+      }
     } catch (err) {
       // A cyclic network has no valid solution. Surface the offending chain
       // rather than persisting dates the engine cannot justify.
@@ -200,6 +217,17 @@ export async function POST(
       criticalPathCount: schedule.criticalPathCodes.length,
       criticalPaths: schedule.criticalPaths,
       feasibility: schedule.feasibility,
+      fit: fit
+        ? {
+            requested: true,
+            achieved: fit.achieved,
+            crewsRequired: fit.crews,
+            residualGapDays: fit.residualGapDays,
+            crewsSearchedUpTo: fit.maxCrewsSearched,
+            attempts: fit.attempts,
+            explanation: fit.explanation,
+          }
+        : { requested: false },
     });
   } catch (err) {
     return handleError(err);

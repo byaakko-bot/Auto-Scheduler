@@ -53,6 +53,18 @@ export default async function ProjectOverviewPage({
 }) {
   const { project, tasks, milestones, risks } = await getDashboardData(params.id);
 
+  if (!project) {
+    return (
+      <div className="px-8 py-10">
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-slate-500">
+            Project not found.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (tasks.length === 0) {
     return (
       <div className="px-8 py-10">
@@ -132,8 +144,68 @@ export default async function ProjectOverviewPage({
     },
   ];
 
+  // Forecast finish is the latest planned finish across the schedule; the
+  // contract date is what the project committed to. Showing only one of them
+  // hides the variance that matters most.
+  const forecastFinish = tasks.reduce<Date | null>(
+    (max, t) => (!max || t.plannedEndDate > max ? t.plannedEndDate : max),
+    null
+  );
+  const contractFinish = project.targetEndDate ?? null;
+  const finishVarianceDays =
+    forecastFinish && contractFinish
+      ? daysBetween(contractFinish, forecastFinish)
+      : null;
+
   return (
     <div className="px-8 py-6">
+      <Card className="mb-4">
+        <CardContent className="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="text-xs font-medium text-slate-500">Project start</p>
+            <p className="mt-1 text-lg font-semibold text-slate-900">
+              {formatDate(project.startDate)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-slate-500">Contract finish</p>
+            <p className="mt-1 text-lg font-semibold text-slate-900">
+              {formatDate(contractFinish)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-slate-500">Forecast finish</p>
+            <p className="mt-1 text-lg font-semibold text-slate-900">
+              {formatDate(forecastFinish)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-slate-500">Variance</p>
+            {finishVarianceDays === null ? (
+              <p className="mt-1 text-lg font-semibold text-slate-400">—</p>
+            ) : (
+              <p
+                className={`mt-1 text-lg font-semibold ${
+                  finishVarianceDays > 0
+                    ? "text-red-600"
+                    : finishVarianceDays < 0
+                    ? "text-emerald-600"
+                    : "text-slate-900"
+                }`}
+              >
+                {finishVarianceDays > 0 ? "+" : ""}
+                {finishVarianceDays} days
+                {finishVarianceDays > 0
+                  ? " late"
+                  : finishVarianceDays < 0
+                  ? " early"
+                  : " on plan"}
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {kpis.map((k) => (
           <Card key={k.label}>

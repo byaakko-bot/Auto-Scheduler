@@ -11,6 +11,7 @@ export function ProjectTabs({ projectId }: { projectId: string }) {
     { href: base, label: "Overview" },
     { href: `${base}/schedule`, label: "Schedule" },
     { href: `${base}/raci`, label: "RACI" },
+    { href: `${base}/settings`, label: "Settings" },
   ];
 
   return (

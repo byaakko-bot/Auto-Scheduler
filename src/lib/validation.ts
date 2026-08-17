@@ -61,6 +61,34 @@ export const createProjectSchema = z.object({
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
 
+// Everything a planner may change after creation. Deliberately includes the
+// fields that drive the schedule — area, floors, method, dates, calendar —
+// because those are exactly the ones that turn out to be wrong first.
+export const updateProjectSchema = z.object({
+  name: z.string().min(2).optional(),
+  clientName: z.string().optional().nullable(),
+  description: z.string().optional().nullable(),
+  country: z.string().min(2).optional(),
+  city: z.string().min(1).optional(),
+  address: z.string().optional().nullable(),
+  buildingType: z.enum(BUILDING_TYPE_VALUES).optional(),
+  constructionMethod: z.enum(CONSTRUCTION_METHOD_VALUES).optional(),
+  totalAreaSqm: z.number().positive().optional(),
+  numberOfFloors: z.number().int().positive().optional(),
+  numberOfUnits: z.number().int().nonnegative().optional().nullable(),
+  numberOfBasements: z.number().int().nonnegative().optional(),
+  startDate: z.string().optional(),
+  targetEndDate: z.string().optional().nullable(),
+  workingDaysPerWeek: z.number().int().min(1).max(7).optional(),
+  workingHoursPerDay: z.number().int().min(1).max(24).optional(),
+  currency: z.string().optional(),
+  status: z.string().optional(),
+  nearCriticalThresholdDays: z.number().int().nonnegative().optional(),
+  watchThresholdDays: z.number().int().nonnegative().optional(),
+});
+
+export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+
 export const updateTaskSchema = z.object({
   progressPct: z.number().min(0).max(100).optional(),
   status: z
