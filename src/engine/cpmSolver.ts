@@ -288,8 +288,30 @@ export function solve(
     node.lf = applyLateConstraint(node, lf);
     node.ls = node.lf - node.durationDays;
     node.float = node.ls - node.es;
-    node.isCritical = node.float <= 0;
-    node.band = bandFor(node.float, nearThreshold, watchThreshold);
+  }
+
+  // Criticality is measured against the LEAST float in the network, not
+  // against zero. A schedule that comfortably beats its deadline still has a
+  // longest path, and that path is what governs the finish date — reporting
+  // "no critical activities" because everything has slack against a generous
+  // deadline hides the very chain a planner needs to protect.
+  //
+  // When the deadline binds, least float is zero or negative and the threshold
+  // collapses to the conventional "float <= 0".
+  const leastFloat = tasks.length
+    ? Math.min(...tasks.map((t) => t.float))
+    : 0;
+  const criticalThreshold = Math.max(0, leastFloat);
+
+  for (const node of tasks) {
+    node.isCritical = node.float <= criticalThreshold;
+    // Bands are relative to the critical threshold, so "near critical" means
+    // near the governing chain rather than near an arbitrary zero.
+    node.band = bandFor(
+      node.float - criticalThreshold,
+      nearThreshold,
+      watchThreshold
+    );
   }
 
   // ── Free float ──────────────────────────────────────────────────
@@ -333,8 +355,13 @@ function enumerateCriticalPaths(
   graph: Graph,
   nearThreshold: number
 ): string[][] {
+  // Same threshold basis as isCritical: least float, not zero.
+  const leastFloat = tasks.length ? Math.min(...tasks.map((t) => t.float)) : 0;
+  const criticalThreshold = Math.max(0, leastFloat);
   const eligible = new Set(
-    tasks.filter((t) => t.float <= nearThreshold).map((t) => t.taskId)
+    tasks
+      .filter((t) => t.float - criticalThreshold <= nearThreshold)
+      .map((t) => t.taskId)
   );
   if (eligible.size === 0) return [];
 

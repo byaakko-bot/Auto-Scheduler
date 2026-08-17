@@ -102,8 +102,31 @@ describe("deadlines and feasibility", () => {
 
     expect(result.isFeasible).toBe(true);
     expect(result.nodes.every((n) => n.float === 10)).toBe(true);
-    // Nothing is critical when the whole chain has slack against the deadline.
-    expect(result.nodes.some((n) => n.isCritical)).toBe(false);
+    // The longest path is still critical even though it beats the deadline:
+    // criticality is measured against LEAST float, not against zero, so the
+    // chain governing the finish date stays visible.
+    expect(result.nodes.every((n) => n.isCritical)).toBe(true);
+  });
+
+  it("still identifies a critical path when the deadline is generous", () => {
+    // A -> LONG -> C governs; SHORT has genuine slack. With a deadline far in
+    // the future every float is positive, and a "float <= 0" rule would report
+    // no critical activities at all.
+    const nodes = [
+      node("A", 10),
+      node("SHORT", 2, [fs("A")]),
+      node("LONG", 10, [fs("A")]),
+      node("C", 5, [fs("SHORT"), fs("LONG")]),
+    ];
+    const result = solve(nodes, { deadline: 100 });
+    const by = Object.fromEntries(result.nodes.map((n) => [n.taskId, n]));
+
+    expect(result.nodes.some((n) => n.isCritical)).toBe(true);
+    expect(by.A.isCritical).toBe(true);
+    expect(by.LONG.isCritical).toBe(true);
+    expect(by.C.isCritical).toBe(true);
+    expect(by.SHORT.isCritical).toBe(false);
+    expect(result.criticalPaths.length).toBeGreaterThan(0);
   });
 });
 
