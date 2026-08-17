@@ -11,8 +11,11 @@ export const RC_RESIDENTIAL: TaskTemplate[] = [
   { code: "M_DESIGN", name: "Design Complete", phase: "DESIGN", durationFormula: "FIXED", defaultDays: 0, isMilestone: true, predecessors: [{ code: "D2", type: "FS", lag: 0 }, { code: "D3", type: "FS", lag: 0 }, { code: "D4", type: "FS", lag: 0 }] },
 
   // ── PERMITS ───────────────────────────────────────────────
-  { code: "P1", name: "Planning Permit", phase: "PERMITS", durationFormula: "PERMIT_APPROVAL", predecessors: [{ code: "D2", type: "FS", lag: 0 }] },
-  { code: "P2", name: "Building Permit", phase: "PERMITS", durationFormula: "BUILDING_PERMIT", predecessors: [{ code: "P1", type: "FS", lag: 0 }] },
+  // Planning consent concerns use and massing, so it follows concept design
+  // and runs in parallel with detailed design. The building permit needs the
+  // structural package as well as planning consent.
+  { code: "P1", name: "Planning Permit", phase: "PERMITS", durationFormula: "PERMIT_APPROVAL", predecessors: [{ code: "D1", type: "FS", lag: 0 }] },
+  { code: "P2", name: "Building Permit", phase: "PERMITS", durationFormula: "BUILDING_PERMIT", predecessors: [{ code: "P1", type: "FS", lag: 0 }, { code: "D2", type: "FS", lag: 0 }] },
   { code: "M_PERMITS", name: "All Permits Approved", phase: "PERMITS", durationFormula: "FIXED", defaultDays: 0, isMilestone: true, predecessors: [{ code: "P2", type: "FS", lag: 0 }] },
 
   // ── PROCUREMENT (long-lead, runs in parallel) ─────────────
@@ -21,13 +24,13 @@ export const RC_RESIDENTIAL: TaskTemplate[] = [
   { code: "PR3", name: "Windows & Doors", phase: "PROCUREMENT", durationFormula: "PROCUREMENT_WINDOWS", predecessors: [{ code: "D4", type: "FS", lag: 0 }] },
 
   // ── SITE PREP ─────────────────────────────────────────────
-  { code: "S1", name: "Site Setup & Hoarding", phase: "SITE_PREP", durationFormula: "SITE_SETUP", predecessors: [{ code: "P2", type: "FS", lag: 0 }] },
+  { code: "S1", name: "Site Setup & Hoarding", phase: "SITE_PREP", durationFormula: "SITE_SETUP", predecessors: [{ code: "P1", type: "FS", lag: 0 }] },
 
   // ── EARTHWORKS ────────────────────────────────────────────
   { code: "E1", name: "Excavation & Earthworks", phase: "EARTHWORKS", durationFormula: "EARTHWORKS", quantityUnit: "m3", predecessors: [{ code: "S1", type: "FS", lag: 0 }] },
 
   // ── FOUNDATIONS ───────────────────────────────────────────
-  { code: "F1", name: "Foundations & Raft Slab", phase: "FOUNDATIONS", durationFormula: "FOUNDATIONS", quantityUnit: "m3", predecessors: [{ code: "E1", type: "FS", lag: 0 }] },
+  { code: "F1", name: "Foundations & Raft Slab", phase: "FOUNDATIONS", durationFormula: "FOUNDATIONS", quantityUnit: "m3", predecessors: [{ code: "E1", type: "FS", lag: 0 }, { code: "P2", type: "FS", lag: 0 }] },
   { code: "F2", name: "Basement Walls", phase: "FOUNDATIONS", durationFormula: "BASEMENT_WALLS", predecessors: [{ code: "F1", type: "FS", lag: 0 }] },
   { code: "F3", name: "Basement Waterproofing", phase: "FOUNDATIONS", durationFormula: "WATERPROOFING", predecessors: [{ code: "F2", type: "FS", lag: 0 }] },
 

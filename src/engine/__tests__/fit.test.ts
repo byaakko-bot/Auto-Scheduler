@@ -32,14 +32,16 @@ describe("fitting a schedule to a target date", () => {
   });
 
   it("adds crews until a tighter target is met", () => {
+    // One crew needs ~510 working days, two ~352.
     const loose = generateWithinTarget({
       ...base,
       targetEndDate: new Date("2030-01-01T00:00:00.000Z"),
     });
     const tight = generateWithinTarget({
       ...base,
-      targetEndDate: new Date("2029-01-01T00:00:00.000Z"),
+      targetEndDate: new Date("2028-09-01T00:00:00.000Z"),
     });
+    expect(loose.crews).toBe(1);
     expect(tight.crews).toBeGreaterThan(loose.crews);
     expect(tight.achieved).toBe(true);
   });
@@ -85,14 +87,15 @@ describe("fitting a schedule to a target date", () => {
   it("does not abandon a target that more crews would have met", () => {
     // Reachable only in the upper half of the crew range. A stop rule based on
     // diminishing returns alone would wrongly give up before finding it.
+    const target = "2028-06-01T00:00:00.000Z"; // reachable only at 3+ crews
     const r = generateWithinTarget(
-      { ...base, targetEndDate: new Date("2028-08-01T00:00:00.000Z") },
+      { ...base, targetEndDate: new Date(target) },
       { maxCrews: 10 }
     );
     expect(r.achieved).toBe(true);
     expect(r.crews).toBeGreaterThan(2);
     expect(r.schedule.projectEndDate.getTime()).toBeLessThanOrEqual(
-      new Date("2028-08-01T00:00:00.000Z").getTime()
+      new Date(target).getTime()
     );
   });
 

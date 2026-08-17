@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/Progress";
 import { SCurveChart, type SCurvePoint } from "@/components/charts/SCurveChart";
 import { RISK_COLORS } from "@/lib/constants";
 import { daysBetween, formatDate, titleCase } from "@/lib/utils";
+import { buildCalendar, daysBetweenWorking } from "@/engine/calendarEngine";
 
 export const dynamic = "force-dynamic";
 
@@ -152,9 +153,16 @@ export default async function ProjectOverviewPage({
     null
   );
   const contractFinish = project.targetEndDate ?? null;
+
+  // Reported in WORKING days, matching the engine and the API. A calendar-day
+  // figure disagrees with every other number in the product on any project
+  // that does not work a 7-day week.
+  const calendar = buildCalendar(project.workingDaysPerWeek);
   const finishVarianceDays =
     forecastFinish && contractFinish
-      ? daysBetween(contractFinish, forecastFinish)
+      ? forecastFinish > contractFinish
+        ? daysBetweenWorking(contractFinish, forecastFinish, calendar)
+        : -daysBetweenWorking(forecastFinish, contractFinish, calendar)
       : null;
 
   return (
@@ -194,14 +202,17 @@ export default async function ProjectOverviewPage({
                 }`}
               >
                 {finishVarianceDays > 0 ? "+" : ""}
-                {finishVarianceDays} days
+                {finishVarianceDays} working days
                 {finishVarianceDays > 0
                   ? " late"
                   : finishVarianceDays < 0
                   ? " early"
-                  : " on plan"}
+                  : ""}
               </p>
             )}
+            <p className="mt-0.5 text-xs text-slate-400">
+              {project.workingDaysPerWeek}-day working week
+            </p>
           </div>
         </CardContent>
       </Card>

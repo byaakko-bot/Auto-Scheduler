@@ -15,8 +15,11 @@ export const INDUSTRIAL_STEEL: TaskTemplate[] = [
   { code: "M_DESIGN", name: "Design Complete", phase: "DESIGN", durationFormula: "FIXED", defaultDays: 0, isMilestone: true, predecessors: [{ code: "D2", type: "FS", lag: 0 }, { code: "D3", type: "FS", lag: 0 }] },
 
   // ── PERMITS ───────────────────────────────────────────────
-  { code: "P1", name: "Planning Permit", phase: "PERMITS", durationFormula: "PERMIT_APPROVAL", predecessors: [{ code: "D2", type: "FS", lag: 0 }] },
-  { code: "P2", name: "Building Permit", phase: "PERMITS", durationFormula: "BUILDING_PERMIT", predecessors: [{ code: "P1", type: "FS", lag: 0 }] },
+  // Planning consent concerns use and massing, so it follows concept design
+  // and runs in parallel with detailed design. The building permit needs the
+  // structural package as well as planning consent.
+  { code: "P1", name: "Planning Permit", phase: "PERMITS", durationFormula: "PERMIT_APPROVAL", predecessors: [{ code: "D1", type: "FS", lag: 0 }] },
+  { code: "P2", name: "Building Permit", phase: "PERMITS", durationFormula: "BUILDING_PERMIT", predecessors: [{ code: "P1", type: "FS", lag: 0 }, { code: "D2", type: "FS", lag: 0 }] },
   { code: "M_PERMITS", name: "All Permits Approved", phase: "PERMITS", durationFormula: "FIXED", defaultDays: 0, isMilestone: true, predecessors: [{ code: "P2", type: "FS", lag: 0 }] },
 
   // ── PROCUREMENT (steel is the long lead) ──────────────────
@@ -25,12 +28,15 @@ export const INDUSTRIAL_STEEL: TaskTemplate[] = [
   { code: "PR3", name: "MEP & Process Equipment", phase: "PROCUREMENT", durationFormula: "PROCUREMENT_MEP", predecessors: [{ code: "D3", type: "FS", lag: 0 }] },
 
   // ── SITE PREP & EARTHWORKS ────────────────────────────────
-  { code: "S1", name: "Site Setup & Access Roads", phase: "SITE_PREP", durationFormula: "SITE_SETUP", predecessors: [{ code: "P2", type: "FS", lag: 0 }] },
+  // Mobilisation and bulk earthworks proceed under planning consent. Only
+  // permanent works below wait on the building permit, so permitting no
+  // longer blocks every activity on site.
+  { code: "S1", name: "Site Setup & Access Roads", phase: "SITE_PREP", durationFormula: "SITE_SETUP", predecessors: [{ code: "P1", type: "FS", lag: 0 }] },
   { code: "E1", name: "Bulk Earthworks & Levelling", phase: "EARTHWORKS", durationFormula: "EARTHWORKS", quantityUnit: "m3", predecessors: [{ code: "S1", type: "FS", lag: 0 }] },
   { code: "E2", name: "Ground Improvement & Piling", phase: "EARTHWORKS", durationFormula: "FIXED", defaultDays: 21, predecessors: [{ code: "E1", type: "FS", lag: 0 }] },
 
   // ── FOUNDATIONS ───────────────────────────────────────────
-  { code: "F1", name: "Pad & Strip Foundations", phase: "FOUNDATIONS", durationFormula: "FOUNDATIONS", quantityUnit: "m3", predecessors: [{ code: "E2", type: "FS", lag: 0 }] },
+  { code: "F1", name: "Pad & Strip Foundations", phase: "FOUNDATIONS", durationFormula: "FOUNDATIONS", quantityUnit: "m3", predecessors: [{ code: "E2", type: "FS", lag: 0 }, { code: "P2", type: "FS", lag: 0 }] },
   { code: "F2", name: "Holding-Down Bolts & Grouting", phase: "FOUNDATIONS", durationFormula: "FIXED", defaultDays: 10, predecessors: [{ code: "F1", type: "FS", lag: 0 }] },
   { code: "F3", name: "Under-Slab Membrane", phase: "FOUNDATIONS", durationFormula: "WATERPROOFING", quantityUnit: "m2", predecessors: [{ code: "F1", type: "FS", lag: 0 }] },
 

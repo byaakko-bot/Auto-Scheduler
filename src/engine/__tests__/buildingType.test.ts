@@ -3,6 +3,8 @@ import { generateSchedule } from "../index";
 import { DEFAULT_PRODUCTIVITY } from "../constants";
 import { templateNameFor } from "../templateSelector";
 import { takeoff, profileFor } from "../quantities";
+import { RC_RESIDENTIAL } from "../templates/rc_residential";
+import { INDUSTRIAL_STEEL } from "../templates/industrial_steel";
 
 const werhahn = {
   totalAreaSqm: 13000,
@@ -105,5 +107,50 @@ describe("Werhahn Factory regression", () => {
     expect(s.feasibility.gapWorkingDays).toBeGreaterThan(0);
     // And the target date itself is preserved, not overwritten by the forecast.
     expect(s.feasibility.targetEndDate?.toISOString().slice(0, 10)).toBe("2028-05-01");
+  });
+});
+
+describe("permitting weight in the network", () => {
+  const templates: [string, { code: string; predecessors: { code: string }[] }[]][] = [
+    ["rc_residential", RC_RESIDENTIAL],
+    ["industrial_steel", INDUSTRIAL_STEEL],
+  ];
+
+  it("does not let the building permit gate site mobilisation", () => {
+    // Site setup and bulk earthworks proceed under planning consent; only
+    // permanent works wait on the building permit.
+    for (const [name, activities] of templates) {
+      const preds = activities
+        .find((a) => a.code === "S1")!
+        .predecessors.map((p) => p.code);
+      expect(preds, name).toContain("P1");
+      expect(preds, name).not.toContain("P2");
+
+      // But foundations do wait on it.
+      const foundations = activities.find((a) => a.code === "F1")!;
+      expect(foundations.predecessors.map((p) => p.code), name).toContain("P2");
+    }
+  });
+
+  it("runs planning consent alongside detailed design, not after it", () => {
+    for (const [name, activities] of templates) {
+      // Planning follows concept design (D1), not structural design (D2).
+      const planning = activities.find((a) => a.code === "P1")!;
+      expect(planning.predecessors.map((p) => p.code), name).toEqual(["D1"]);
+    }
+  });
+
+  it("keeps the building permit off the critical path for the factory", () => {
+    const s = generateSchedule(werhahn);
+    const buildingPermit = s.tasks.find((t) => t.code === "P2")!;
+    expect(buildingPermit.isCritical).toBe(false);
+    expect(buildingPermit.floatDays).toBeGreaterThan(0);
+  });
+
+  it("shortens the factory programme materially versus permit-gated logic", () => {
+    // Was 429 working days when every site activity waited on the building
+    // permit and permits trailed full structural design.
+    const s = generateSchedule(werhahn);
+    expect(s.projectDurationWorkingDays).toBeLessThan(380);
   });
 });
