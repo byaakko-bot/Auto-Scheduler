@@ -213,6 +213,23 @@ describe("§40 — why are we late", () => {
     expect(lag.evidence).toContain("7 days of lag against 0");
   });
 
+  it("does not report lag growth when the baseline recorded no lag data", () => {
+    // The baseline snapshot stores durations but not link lags. Treating that
+    // absence as "baseline lag was 0" would report every legitimate template
+    // lag as a regression.
+    const nodes = [
+      node("A", 10),
+      node("B", 20, [fs("A", 10)]),
+      node("C", 5, [fs("B", 3)]),
+    ];
+    const r = analyseRootCause({
+      current: solve(nodes),
+      baseline, // no `lags` on any record
+      baselineDurationDays: 35,
+    });
+    expect(r.causes.filter((c) => c.kind === "LAG_INCREASE")).toHaveLength(0);
+  });
+
   it("treats an unbaselined critical activity as added scope", () => {
     const nodes = [
       node("A", 10),

@@ -133,9 +133,16 @@ export function analyseRootCause(input: RootCauseInput): RootCauseAnalysis {
     }
 
     // Lag growth on the links that make up the driving chain.
+    //
+    // Only attributable when the baseline actually recorded link lags. Absent
+    // lag data is not evidence of a zero baseline lag: assuming so reports
+    // every legitimate template lag as a regression (§42).
+    if (!base.lags) continue;
+
     for (const pred of node.predecessors) {
       if (!path.includes(pred.taskId)) continue;
-      const baseLag = base.lags?.get(pred.taskId) ?? 0;
+      const baseLag = base.lags.get(pred.taskId);
+      if (baseLag === undefined) continue;
       const lagGrowth = pred.lag - baseLag;
       if (lagGrowth > 0) {
         causes.push({
