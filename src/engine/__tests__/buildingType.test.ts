@@ -154,3 +154,80 @@ describe("permitting weight in the network", () => {
     expect(s.projectDurationWorkingDays).toBeLessThan(380);
   });
 });
+
+describe("work already complete before the programme starts", () => {
+  const balgyn = {
+    totalAreaSqm: 9645.9,
+    numberOfFloors: 5,
+    numberOfUnits: 1,
+    numberOfBasements: 0,
+    numberOfBuildings: 1,
+    crewSize: 20,
+    crews: 5,
+    productivityRates: DEFAULT_PRODUCTIVITY,
+    constructionMethod: "AAC_BLOCKS" as const,
+    buildingType: "RESIDENTIAL_APARTMENT" as const,
+    startDate: new Date("2026-10-01T00:00:00.000Z"),
+    workingDaysPerWeek: 7,
+  };
+
+  it("carries completed design at zero duration", () => {
+    const s = generateSchedule({ ...balgyn, designComplete: true });
+    for (const t of s.tasks.filter((x) => x.phase === "DESIGN")) {
+      expect(t.durationDays, t.code).toBe(0);
+    }
+    const d1 = s.tasks.find((t) => t.code === "D1")!;
+    expect(d1.durationBasis).toContain("completed before the programme starts");
+  });
+
+  it("keeps completed activities in the WBS rather than deleting them", () => {
+    const withDesign = generateSchedule(balgyn);
+    const without = generateSchedule({ ...balgyn, designComplete: true });
+    expect(without.tasks.length).toBe(withDesign.tasks.length);
+    expect(without.tasks.some((t) => t.code === "D1")).toBe(true);
+  });
+
+  it("shortens the programme when design is already done", () => {
+    const before = generateSchedule(balgyn).projectDurationWorkingDays;
+    const after = generateSchedule({
+      ...balgyn,
+      designComplete: true,
+    }).projectDurationWorkingDays;
+    expect(after).toBeLessThan(before);
+  });
+
+  it("shortens it further when permits are already granted", () => {
+    const designOnly = generateSchedule({
+      ...balgyn,
+      designComplete: true,
+    }).projectDurationWorkingDays;
+    const both = generateSchedule({
+      ...balgyn,
+      designComplete: true,
+      permitsObtained: true,
+    }).projectDurationWorkingDays;
+    expect(both).toBeLessThan(designOnly);
+  });
+
+  it("changes nothing when no stage is declared complete", () => {
+    const a = generateSchedule(balgyn).projectDurationWorkingDays;
+    const b = generateSchedule({
+      ...balgyn,
+      designComplete: false,
+      permitsObtained: false,
+      procurementPlaced: false,
+    }).projectDurationWorkingDays;
+    expect(a).toBe(b);
+  });
+
+  it("still respects downstream logic — site work follows the zeroed permit", () => {
+    const s = generateSchedule({
+      ...balgyn,
+      designComplete: true,
+      permitsObtained: true,
+    });
+    const s1 = s.tasks.find((t) => t.code === "S1")!;
+    // Site setup can now start on day one rather than after 87 days.
+    expect(s1.earlyStartOffset).toBe(0);
+  });
+});

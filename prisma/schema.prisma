@@ -218,6 +218,13 @@ model Project {
   nearCriticalThresholdDays Int @default(5)
   watchThresholdDays        Int @default(10)
 
+  // Work already finished before the programme starts. Many projects are
+  // designed and consented before a contractor is appointed, and carrying
+  // those activities at full duration pushes every site date out.
+  designComplete   Boolean @default(false)
+  permitsObtained  Boolean @default(false)
+  procurementPlaced Boolean @default(false)
+
   // Default calendar applied to activities that do not name their own.
   defaultCalendarId String?
   defaultCalendar   Calendar? @relation("ProjectDefaultCalendar", fields: [defaultCalendarId], references: [id])

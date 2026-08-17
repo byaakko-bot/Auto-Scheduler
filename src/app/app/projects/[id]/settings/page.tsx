@@ -39,6 +39,9 @@ export default async function ProjectSettingsPage({
           workingDaysPerWeek: project.workingDaysPerWeek,
           workingHoursPerDay: project.workingHoursPerDay,
           currency: project.currency,
+          designComplete: project.designComplete,
+          permitsObtained: project.permitsObtained,
+          procurementPlaced: project.procurementPlaced,
         }}
       />
     </div>

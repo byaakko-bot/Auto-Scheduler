@@ -37,6 +37,9 @@ const SCHEDULE_DRIVING = new Set([
   "targetEndDate",
   "workingDaysPerWeek",
   "workingHoursPerDay",
+  "designComplete",
+  "permitsObtained",
+  "procurementPlaced",
 ]);
 
 export async function PATCH(

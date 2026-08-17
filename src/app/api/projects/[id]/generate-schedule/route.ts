@@ -84,6 +84,9 @@ export async function POST(
       permitWeeks,
       nearCriticalThreshold: project.nearCriticalThresholdDays,
       watchThreshold: project.watchThresholdDays,
+      designComplete: project.designComplete,
+      permitsObtained: project.permitsObtained,
+      procurementPlaced: project.procurementPlaced,
     };
 
     let schedule;

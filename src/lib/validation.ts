@@ -85,6 +85,10 @@ export const updateProjectSchema = z.object({
   status: z.string().optional(),
   nearCriticalThresholdDays: z.number().int().nonnegative().optional(),
   watchThresholdDays: z.number().int().nonnegative().optional(),
+  // Work already finished before the programme starts.
+  designComplete: z.boolean().optional(),
+  permitsObtained: z.boolean().optional(),
+  procurementPlaced: z.boolean().optional(),
 });
 
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;

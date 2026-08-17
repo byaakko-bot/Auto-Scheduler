@@ -113,6 +113,14 @@ export interface ProjectInputs {
   permitWeeks?: number;
   nearCriticalThreshold?: number;
   watchThreshold?: number;
+  /**
+   * Work already finished before the programme starts. Design and consent are
+   * routinely complete before a contractor is appointed; carrying them at full
+   * duration pushes every site date out by months.
+   */
+  designComplete?: boolean;
+  permitsObtained?: boolean;
+  procurementPlaced?: boolean;
 }
 
 export interface TaskWithDuration extends TaskTemplate {

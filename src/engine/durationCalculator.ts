@@ -210,6 +210,23 @@ function computeQuantity(
 }
 
 
+
+/**
+ * Phases the project declares finished before day one. Their activities stay
+ * in the WBS as a record and keep their logic, but consume no time — so the
+ * programme starts with the first activity that has not already happened.
+ */
+function isAlreadyComplete(phase: string, inputs: ProjectInputs): boolean {
+  if (phase === "DESIGN") return inputs.designComplete === true;
+  if (phase === "PERMITS") return inputs.permitsObtained === true;
+  if (phase === "PROCUREMENT") return inputs.procurementPlaced === true;
+  return false;
+}
+
+function titleCasePhase(phase: string): string {
+  return phase.charAt(0) + phase.slice(1).toLowerCase().replace(/_/g, " ");
+}
+
 function cycleConstrainedDays(
   activityCode: string,
   inputs: ProjectInputs
@@ -247,6 +264,17 @@ export function calculateTaskDurations(
   return template.map((task) => {
     if (task.isMilestone) {
       return { ...task, durationDays: 0, quantity: undefined };
+    }
+
+    if (isAlreadyComplete(task.phase, inputs)) {
+      return {
+        ...task,
+        durationDays: 0,
+        quantity: undefined,
+        durationBasis:
+          `${titleCasePhase(task.phase)} completed before the programme starts; ` +
+          `carried at zero duration.`,
+      };
     }
 
     const binding = bindingFor(

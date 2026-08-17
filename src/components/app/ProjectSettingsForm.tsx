@@ -27,6 +27,9 @@ export interface ProjectSettings {
   workingDaysPerWeek: number;
   workingHoursPerDay: number;
   currency: string;
+  designComplete: boolean;
+  permitsObtained: boolean;
+  procurementPlaced: boolean;
 }
 
 const inputCls =
@@ -93,6 +96,9 @@ export function ProjectSettingsForm({
           workingDaysPerWeek: Number(form.workingDaysPerWeek),
           workingHoursPerDay: Number(form.workingHoursPerDay),
           currency: form.currency,
+          designComplete: form.designComplete,
+          permitsObtained: form.permitsObtained,
+          procurementPlaced: form.procurementPlaced,
         }),
       });
       const json = await res.json();
@@ -303,6 +309,41 @@ export function ProjectSettingsForm({
               Target completion must be after the start date.
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Already complete before start</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-xs text-slate-500">
+            Tick anything finished before the programme begins. Those activities
+            stay in the WBS for the record but consume no time, so the schedule
+            starts with the first work that has not already happened.
+          </p>
+          {(
+            [
+              ["designComplete", "Design complete", "Concept, structural, MEP and interior design signed off."],
+              ["permitsObtained", "Permits obtained", "Planning consent and building permit already granted."],
+              ["procurementPlaced", "Procurement placed", "Long-lead orders already committed with suppliers."],
+            ] as const
+          ).map(([key, label, hint]) => (
+            <label key={key} className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                checked={form[key]}
+                onChange={(e) => set(key, e.target.checked)}
+              />
+              <span>
+                <span className="block text-sm font-medium text-slate-800">
+                  {label}
+                </span>
+                <span className="block text-xs text-slate-500">{hint}</span>
+              </span>
+            </label>
+          ))}
         </CardContent>
       </Card>
 
