@@ -49,27 +49,58 @@ export async function PATCH(
 
     const input = updateProjectSchema.parse(await req.json());
 
+    // Clients typically submit the whole form, so "supplied" is not the same
+    // as "changed". Compare against stored values and keep only genuine
+    // differences, otherwise every save would report every field as edited and
+    // mark the schedule stale for no reason.
+    const current = before as unknown as Record<string, unknown>;
+    const sameAsStored = (key: string, value: unknown): boolean => {
+      const stored = current[key];
+      if (value instanceof Date || stored instanceof Date) {
+        const a = value instanceof Date ? value.getTime() : null;
+        const b = stored instanceof Date ? stored.getTime() : null;
+        return a === b;
+      }
+      // Treat "" and null as equivalent for optional text fields.
+      const norm = (v: unknown) => (v === "" || v === null ? null : v);
+      return norm(stored) === norm(value);
+    };
+
     const data: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(input)) {
       if (value === undefined) continue;
+
+      let next: unknown;
       if (key === "startDate" && typeof value === "string") {
-        data.startDate = new Date(value);
+        next = new Date(value);
       } else if (key === "targetEndDate") {
-        data.targetEndDate = value ? new Date(value as string) : null;
+        next = value ? new Date(value as string) : null;
       } else {
-        data[key] = value;
+        next = value;
       }
+
+      if (sameAsStored(key, next)) continue;
+      data[key] = next;
     }
 
     if (Object.keys(data).length === 0) {
-      return fail("No editable fields supplied", 422);
+      return ok({
+        project: before,
+        scheduleStale: false,
+        staleBecause: [],
+        message: "No changes to save.",
+      });
     }
 
-    if (
-      data.startDate &&
-      data.targetEndDate &&
-      (data.targetEndDate as Date) <= (data.startDate as Date)
-    ) {
+    // Validate against the effective values: only changed fields are present
+    // in `data`, so an unchanged start date still has to be honoured.
+    const effectiveStart = (data.startDate as Date) ?? before.startDate;
+    const effectiveTarget =
+      "targetEndDate" in data
+        ? (data.targetEndDate as Date | null)
+        : before.targetEndDate;
+
+    if (effectiveTarget && effectiveStart && effectiveTarget <= effectiveStart) {
       return fail("Target end date must be after the start date", 422);
     }
 
