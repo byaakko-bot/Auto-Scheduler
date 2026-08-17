@@ -26,10 +26,12 @@ export async function GET(
       where: { projectId: params.id },
       orderBy: { sortOrder: "asc" },
     });
-    const currentById = new Map(current.map((t) => [t.id, t]));
+    // Matched by activity code, not row id: a snapshot must survive the live
+    // task being regenerated, which replaces every id.
+    const currentByCode = new Map(current.map((t) => [t.code, t]));
 
     const rows = baseline.tasks.map((b) => {
-      const now = currentById.get(b.taskId);
+      const now = currentByCode.get(b.code);
       if (!now) {
         return {
           taskId: b.taskId,
@@ -62,9 +64,9 @@ export async function GET(
       };
     });
 
-    const baselineTaskIds = new Set(baseline.tasks.map((t) => t.taskId));
+    const baselineCodes = new Set(baseline.tasks.map((t) => t.code));
     const added = current
-      .filter((t) => !baselineTaskIds.has(t.id))
+      .filter((t) => !baselineCodes.has(t.code))
       .map((t) => ({
         taskId: t.id,
         code: t.code,

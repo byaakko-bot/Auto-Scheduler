@@ -22,6 +22,24 @@ export async function POST(
     if (!project) return fail("Project not found", 404);
 
     const body = await req.json().catch(() => ({}));
+
+    // §23 — regenerating replaces every activity. With an approved baseline in
+    // place that discards the plan variance is measured against, so it has to
+    // be a deliberate act rather than a side effect.
+    const approved = await db.baseline.findFirst({
+      where: { projectId: params.id, status: "APPROVED" },
+      select: { name: true },
+    });
+    if (approved && body.force !== true) {
+      return fail(
+        `Baseline "${approved.name}" is approved. Regenerating replaces every ` +
+          `activity and would discard the plan your variance is measured ` +
+          `against. Re-send with { "force": true } to proceed deliberately.`,
+        409,
+        { approvedBaseline: approved.name }
+      );
+    }
+
     const crewSize: number = body.crewSize ?? 20;
     const permitWeeks: number | undefined = body.permitWeeks ?? undefined;
     const productivityRates: ProductivityRates =

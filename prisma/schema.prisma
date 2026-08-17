@@ -675,12 +675,16 @@ model Baseline {
   @@unique([projectId, name])
 }
 
+// A snapshot row is self-contained: it carries the code, name and dates it was
+// captured with, so it survives the live task being deleted or regenerated.
+// The link back to the live task is a convenience, not the record — cascading
+// from it would silently empty an approved baseline (§23).
 model BaselineTask {
   id         String   @id @default(cuid())
   baselineId String
   baseline   Baseline @relation(fields: [baselineId], references: [id], onDelete: Cascade)
-  taskId     String
-  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId     String?
+  task       Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
   code          String
   name          String
@@ -690,7 +694,7 @@ model BaselineTask {
   floatDays     Int      @default(0)
   isCritical    Boolean  @default(false)
 
-  @@unique([baselineId, taskId])
+  @@unique([baselineId, code])
 }
 
 // ─── SCHEDULE REVISIONS (§24) ─────────────────────────────────────
