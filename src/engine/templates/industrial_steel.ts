@@ -43,7 +43,7 @@ export const INDUSTRIAL_STEEL: TaskTemplate[] = [
   { code: "EN1", name: "Wall Cladding", phase: "ENVELOPE", durationFormula: "EXTERNAL_WALLS", quantityUnit: "m2", predecessors: [{ code: "ST1", type: "SS", lag: 15 }, { code: "PR2", type: "FS", lag: 0 }] },
   { code: "R1", name: "Roof Sheeting & Insulation", phase: "ROOF", durationFormula: "ROOF", quantityUnit: "m2", predecessors: [{ code: "ST2", type: "SS", lag: 5 }, { code: "PR2", type: "FS", lag: 0 }] },
   { code: "W1", name: "Doors, Louvres & Dock Levellers", phase: "WINDOWS_DOORS", durationFormula: "WINDOWS_DOORS", quantityUnit: "ea", predecessors: [{ code: "EN1", type: "FS", lag: 0 }] },
-  { code: "M_WATERTIGHT", name: "Building Watertight", phase: "WINDOWS_DOORS", durationFormula: "FIXED", defaultDays: 0, isMilestone: true, predecessors: [{ code: "R1", type: "FS", lag: 0 }, { code: "EN1", type: "FS", lag: 0 }] },
+  { code: "M_WATERTIGHT", name: "Building Watertight", phase: "WINDOWS_DOORS", durationFormula: "FIXED", defaultDays: 0, isMilestone: true, predecessors: [{ code: "R1", type: "FS", lag: 0 }, { code: "EN1", type: "FS", lag: 0 }, { code: "W1", type: "FS", lag: 0 }] },
 
   // ── FLOOR SLAB (the dominant concrete activity in a shed) ─
   { code: "SC1", name: "Power-Floated Floor Slab", phase: "SCREED_FLOORS", durationFormula: "SCREED_FLOORS", quantityUnit: "m2", predecessors: [{ code: "F3", type: "FS", lag: 0 }, { code: "ST1", type: "FS", lag: 0 }] },
@@ -66,7 +66,7 @@ export const INDUSTRIAL_STEEL: TaskTemplate[] = [
 
   // ── INSPECTIONS / COMMISSIONING / HANDOVER ────────────────
   { code: "IN1", name: "Fire & Sprinkler Certification", phase: "INSPECTIONS", durationFormula: "INSPECTION", predecessors: [{ code: "MEP1", type: "FS", lag: 0 }] },
-  { code: "IN2", name: "Building Control Final", phase: "INSPECTIONS", durationFormula: "INSPECTION", predecessors: [{ code: "IN1", type: "FS", lag: 0 }, { code: "FN5", type: "FS", lag: 0 }] },
+  { code: "IN2", name: "Building Control Final", phase: "INSPECTIONS", durationFormula: "INSPECTION", predecessors: [{ code: "IN1", type: "FS", lag: 0 }, { code: "FN5", type: "FS", lag: 0 }, { code: "FN2", type: "FS", lag: 0 }, { code: "FN3", type: "FS", lag: 0 }, { code: "EX1", type: "FS", lag: 0 }] },
   { code: "CM1", name: "Systems & Process Commissioning", phase: "COMMISSIONING", durationFormula: "COMMISSIONING", predecessors: [{ code: "IN2", type: "FS", lag: 0 }, { code: "MEP2", type: "FS", lag: 0 }] },
   { code: "HO1", name: "Snagging", phase: "HANDOVER", durationFormula: "FIXED", defaultDays: 10, predecessors: [{ code: "CM1", type: "FS", lag: 0 }] },
   { code: "HO2", name: "Final Handover", phase: "HANDOVER", durationFormula: "HANDOVER", predecessors: [{ code: "HO1", type: "FS", lag: 0 }] },

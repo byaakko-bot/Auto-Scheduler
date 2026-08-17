@@ -167,8 +167,14 @@ export function analyseScheduleHealth(input: HealthInput): HealthReport {
     });
   }
 
+  // Zero-duration milestones legitimately mark a state and may drive nothing.
+  // A work activity that drives nothing is a modelling error: its slippage is
+  // invisible to the critical path.
   const danglingSuccs = nodes
-    .filter((n) => (successorsOf.get(n.taskId) ?? []).length === 0)
+    .filter(
+      (n) =>
+        n.durationDays > 0 && (successorsOf.get(n.taskId) ?? []).length === 0
+    )
     .map((n) => n.taskId);
   if (danglingSuccs.length > 1) {
     add({
@@ -176,8 +182,8 @@ export function analyseScheduleHealth(input: HealthInput): HealthReport {
       category: "LOGIC",
       severity: "WARNING",
       message:
-        `${danglingSuccs.length} activities have no successor. Their finish drives ` +
-        `nothing, so delays to them are invisible to the critical path.`,
+        `${danglingSuccs.length} work activities have no successor. Their finish ` +
+        `drives nothing, so delays to them are invisible to the critical path.`,
       taskCodes: danglingSuccs,
       penalty: Math.min(danglingSuccs.length * 2, 12),
     });

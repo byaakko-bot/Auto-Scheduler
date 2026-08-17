@@ -69,11 +69,11 @@ export const RC_RESIDENTIAL: TaskTemplate[] = [
   { code: "FN5", name: "MEP Final Fix", phase: "FINISHING", durationFormula: "FIXED", defaultDays: 21, predecessors: [{ code: "MEP1", type: "FS", lag: 0 }, { code: "FN3", type: "FS", lag: 0 }] },
 
   // ── EXTERNAL WORKS ────────────────────────────────────────
-  { code: "EX1", name: "Paving & Landscaping", phase: "EXTERNAL_WORKS", durationFormula: "EXTERNAL_WORKS", predecessors: [{ code: "FA1", type: "FS", lag: 0 }] },
+  { code: "EX1", name: "Paving & Landscaping", phase: "EXTERNAL_WORKS", durationFormula: "EXTERNAL_WORKS", predecessors: [{ code: "FA1", type: "FS", lag: 0 }, { code: "F3", type: "FS", lag: 0 }] },
 
   // ── INSPECTIONS ───────────────────────────────────────────
   { code: "IN1", name: "MEP Inspections", phase: "INSPECTIONS", durationFormula: "INSPECTION", predecessors: [{ code: "FN5", type: "FS", lag: 0 }] },
-  { code: "IN2", name: "Building Control Final", phase: "INSPECTIONS", durationFormula: "INSPECTION", predecessors: [{ code: "IN1", type: "FS", lag: 0 }, { code: "FN4", type: "FS", lag: 0 }] },
+  { code: "IN2", name: "Building Control Final", phase: "INSPECTIONS", durationFormula: "INSPECTION", predecessors: [{ code: "IN1", type: "FS", lag: 0 }, { code: "FN4", type: "FS", lag: 0 }, { code: "EX1", type: "FS", lag: 0 }] },
 
   // ── COMMISSIONING ─────────────────────────────────────────
   { code: "CM1", name: "Systems Commissioning", phase: "COMMISSIONING", durationFormula: "COMMISSIONING", predecessors: [{ code: "IN2", type: "FS", lag: 0 }] },

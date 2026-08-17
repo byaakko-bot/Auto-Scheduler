@@ -298,3 +298,42 @@ describe("out-of-sequence detection", () => {
     expect(out).toEqual([]);
   });
 });
+
+describe("shipped templates pass their own health checks", () => {
+  it("has no dangling work activities in either template", async () => {
+    const { RC_RESIDENTIAL } = await import("../templates/rc_residential");
+    const { INDUSTRIAL_STEEL } = await import("../templates/industrial_steel");
+
+    for (const tpl of [RC_RESIDENTIAL, INDUSTRIAL_STEEL]) {
+      const hasSuccessor = new Set<string>();
+      for (const t of tpl) for (const p of t.predecessors) hasSuccessor.add(p.code);
+      // Milestones may legitimately drive nothing; work activities may not.
+      const dangling = tpl.filter(
+        (t) => !hasSuccessor.has(t.code) && !t.isMilestone
+      );
+      expect(dangling.map((d) => d.code)).toEqual([]);
+    }
+  });
+
+  it("does not flag a zero-duration milestone as dangling", () => {
+    const nodes = [
+      node("A", 10),
+      node("B", 10, [fs("A")]),
+      node("M1", 0, [fs("B")]),
+      node("M2", 0, [fs("B")]),
+    ];
+    const r = analyseScheduleHealth({ nodes, hasApprovedBaseline: true });
+    expect(r.findings.some((f) => f.check === "missing-successors")).toBe(false);
+  });
+
+  it("still flags work activities that drive nothing", () => {
+    const nodes = [
+      node("A", 10),
+      node("W1", 5, [fs("A")]),
+      node("W2", 5, [fs("A")]),
+    ];
+    const r = analyseScheduleHealth({ nodes, hasApprovedBaseline: true });
+    const f = r.findings.find((x) => x.check === "missing-successors")!;
+    expect(f.taskCodes.sort()).toEqual(["W1", "W2"]);
+  });
+});
