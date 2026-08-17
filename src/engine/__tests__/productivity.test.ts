@@ -7,6 +7,8 @@ import {
   type ProductivityRate,
 } from "../productivity";
 import { takeoff } from "../quantities";
+import { generateSchedule } from "../index";
+import { DEFAULT_PRODUCTIVITY } from "../constants";
 
 const crewRate: ProductivityRate = {
   code: "AAC_PANEL",
@@ -195,5 +197,86 @@ describe("end-to-end plausibility (§48 example)", () => {
     const plasterQty = t.items.get("PLASTER")!.quantity;
     const withSix = durationFor(plasterQty, lookup("PLASTER")!, { crews: 6 });
     expect(withSix.durationDays).toBeLessThan(60);
+  });
+});
+
+describe("structural cycle constraint", () => {
+  const base = {
+    totalAreaSqm: 9645.9,
+    numberOfFloors: 5,
+    numberOfUnits: 1,
+    numberOfBasements: 0,
+    numberOfBuildings: 1,
+    crewSize: 20,
+    productivityRates: DEFAULT_PRODUCTIVITY,
+    buildingType: "RESIDENTIAL_APARTMENT" as const,
+    startDate: new Date("2026-10-01T00:00:00.000Z"),
+    workingDaysPerWeek: 7,
+  };
+
+  it("will not build a five-storey frame in a week", () => {
+    // Pour capacity alone gave 7 days for 2,701 m³ at five crews. Each floor
+    // must cure before the next starts, so the cycle governs.
+    const s = generateSchedule({
+      ...base,
+      constructionMethod: "AAC_BLOCKS",
+      crews: 5,
+    });
+    const st1 = s.tasks.find((t) => t.code === "ST1")!;
+    expect(st1.durationDays).toBe(40); // 5 floors x 8-day cycle
+    expect(st1.durationBasis).toContain("cure");
+  });
+
+  it("does not shorten below the cycle no matter how many crews are added", () => {
+    const one = generateSchedule({ ...base, constructionMethod: "AAC_BLOCKS", crews: 1 });
+    const many = generateSchedule({ ...base, constructionMethod: "AAC_BLOCKS", crews: 8 });
+    const a = one.tasks.find((t) => t.code === "ST1")!.durationDays;
+    const b = many.tasks.find((t) => t.code === "ST1")!.durationDays;
+    expect(b).toBeGreaterThanOrEqual(40);
+    expect(b).toBeLessThanOrEqual(a);
+  });
+
+  it("scales with the number of floors", () => {
+    const five = generateSchedule({ ...base, constructionMethod: "AAC_BLOCKS", crews: 5 });
+    const ten = generateSchedule({
+      ...base,
+      numberOfFloors: 10,
+      constructionMethod: "AAC_BLOCKS",
+      crews: 5,
+    });
+    const a = five.tasks.find((t) => t.code === "ST1")!.durationDays;
+    const b = ten.tasks.find((t) => t.code === "ST1")!.durationDays;
+    expect(b).toBeGreaterThan(a);
+  });
+
+  it("gives precast a faster cycle than in-situ concrete", () => {
+    const insitu = generateSchedule({
+      ...base,
+      constructionMethod: "REINFORCED_CONCRETE",
+      crews: 5,
+    });
+    const precast = generateSchedule({
+      ...base,
+      constructionMethod: "PRECAST_CONCRETE",
+      crews: 5,
+    });
+    expect(
+      precast.tasks.find((t) => t.code === "ST1")!.durationDays
+    ).toBeLessThan(insitu.tasks.find((t) => t.code === "ST1")!.durationDays);
+  });
+
+  it("does not constrain a single-storey steel frame beyond its tonnage", () => {
+    const s = generateSchedule({
+      ...base,
+      totalAreaSqm: 13000,
+      numberOfFloors: 1,
+      buildingType: "INDUSTRIAL_WAREHOUSE",
+      constructionMethod: "STEEL_FRAME",
+      crews: 5,
+    });
+    const st1 = s.tasks.find((t) => t.code === "ST1")!;
+    // Tonnage-driven, well above the 1 x 4 day cycle floor.
+    expect(st1.durationBasis).toContain("ton");
+    expect(st1.durationDays).toBeGreaterThan(4);
   });
 });

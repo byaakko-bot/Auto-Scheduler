@@ -46,6 +46,29 @@ export const METHOD_MODIFIERS: Record<ConstructionMethod, MethodModifier> = {
   HYBRID: { structureDurationFactor: 0.72, floatBufferPct: 0.12 },
 };
 
+/**
+ * Irreducible structural cycle time per floor, in working days.
+ *
+ * A multi-storey frame is built floor by floor: formwork, reinforcement,
+ * pour, CURE, strike. Curing is a chemical process — no number of crews
+ * shortens it, and the floor above cannot start until the floor below is
+ * struck. Sizing the structure from pour capacity alone produces a 5-storey
+ * frame in a week, which is why this floor exists.
+ *
+ * Methods that avoid wet concrete on site are correspondingly faster.
+ */
+export const STRUCTURE_CYCLE_DAYS_PER_FLOOR: Record<ConstructionMethod, number> = {
+  REINFORCED_CONCRETE: 10, // formwork + rebar + pour + 7-day cure + strike
+  MASONRY_BLOCKWORK: 8,
+  AAC_BLOCKS: 8, // RC frame with AAC infill still cures
+  AAC_PANELS: 7,
+  HYBRID: 7,
+  PRECAST_CONCRETE: 5, // cured off site; erection and stitching only
+  TIMBER_FRAME: 4,
+  STEEL_FRAME: 4, // erection and bolting, no cure
+  MODULAR: 3,
+};
+
 export const DEFAULT_PRODUCTIVITY: ProductivityRates = {
   foundationM3PerDay: 15,
   structureFloorDays: 21,

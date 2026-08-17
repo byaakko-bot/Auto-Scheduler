@@ -1,5 +1,5 @@
 import { bindingFor } from "./activityRates";
-import { METHOD_MODIFIERS } from "./constants";
+import { METHOD_MODIFIERS, STRUCTURE_CYCLE_DAYS_PER_FLOOR } from "./constants";
 import { buildRateLookup, durationFor } from "./productivity";
 import { takeoff } from "./quantities";
 import type {
@@ -205,6 +205,21 @@ function computeQuantity(
   }
 }
 
+
+// Activities whose duration is set by a repeating cycle rather than by how
+// much labour is thrown at them. Currently the superstructure: one cycle per
+// floor, and curing inside each cycle is not compressible.
+const CYCLE_CONSTRAINED = new Set(["ST1"]);
+
+function cycleConstrainedDays(
+  activityCode: string,
+  inputs: ProjectInputs
+): number {
+  if (!CYCLE_CONSTRAINED.has(activityCode)) return 0;
+  const perFloor = STRUCTURE_CYCLE_DAYS_PER_FLOOR[inputs.constructionMethod] ?? 0;
+  return Math.max(inputs.numberOfFloors, 1) * perFloor;
+}
+
 /**
  * Resolves durations for every activity.
  *
@@ -244,12 +259,32 @@ export function calculateTaskDurations(
 
       if (rate && item) {
         const result = durationFor(item.quantity, rate, { crews });
+
+        // Some activities are governed by a cycle, not by capacity. The
+        // superstructure is built floor by floor and each floor must cure
+        // before the next is started, so no crew count takes it below
+        // floors x cycle time. Without this a five-storey frame is "built"
+        // in a week because the pour rate says so.
+        const cycleFloor = cycleConstrainedDays(task.code, inputs);
+        const durationDays = Math.max(
+          result.durationDays,
+          cycleFloor,
+          task.minDays ?? 1
+        );
+        const cycleGoverned = cycleFloor > result.durationDays;
+
         return {
           ...task,
-          durationDays: Math.max(result.durationDays, task.minDays ?? 1),
+          durationDays,
           quantity: Math.round(item.quantity),
           quantityUnit: item.unit,
-          durationBasis: result.explanation,
+          durationBasis: cycleGoverned
+            ? `${inputs.numberOfFloors} floor(s) x ` +
+              `${STRUCTURE_CYCLE_DAYS_PER_FLOOR[inputs.constructionMethod]} day structural ` +
+              `cycle = ${cycleFloor} working days. Cycle-governed: the pour rate alone ` +
+              `would give ${result.durationDays} days, but each floor must cure before ` +
+              `the next can start, and crews cannot compress curing.`
+            : result.explanation,
           quantityDerivation: item.derivation,
           productivityCode: rate.code,
         };
