@@ -73,15 +73,27 @@ describe("fitting a schedule to a target date", () => {
     expect(r.schedule.tasks.length).toBeGreaterThan(0);
   });
 
-  it("abandons a hopeless target early rather than grinding to the ceiling", () => {
-    // One month for a 13,000 m² factory: unreachable at any crew count.
+  it("keeps searching for the shortest programme when the target is missed", () => {
+    // One month for a 13,000 m² factory is unreachable at any crew count, but
+    // the caller still needs the best achievable duration — giving up at the
+    // first proof of impossibility reports a worse programme than the engine
+    // can actually deliver.
     const r = generateWithinTarget(
       { ...base, targetEndDate: new Date("2027-06-01T00:00:00.000Z") },
-      { maxCrews: 12 }
+      { maxCrews: 8 }
     );
     expect(r.achieved).toBe(false);
-    expect(r.maxCrewsSearched).toBeLessThan(12);
-    expect(r.explanation).toContain("governed by lead times");
+
+    // The returned schedule is the shortest of everything tried.
+    const shortest = Math.min(...r.attempts.map((a) => a.durationWorkingDays));
+    expect(r.schedule.projectDurationWorkingDays).toBe(shortest);
+
+    // And it did not stop while crews were still buying time.
+    const last = r.attempts.at(-1)!;
+    const prev = r.attempts.at(-2);
+    if (prev && r.maxCrewsSearched < 8) {
+      expect(prev.durationWorkingDays - last.durationWorkingDays).toBeLessThanOrEqual(0);
+    }
   });
 
   it("does not abandon a target that more crews would have met", () => {

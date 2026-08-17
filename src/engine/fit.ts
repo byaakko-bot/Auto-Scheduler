@@ -84,24 +84,15 @@ export function generateWithinTarget(
       };
     }
 
-    // Give up only when the target is provably out of reach, not merely when
-    // returns diminish: assume the last marginal saving repeats for every
-    // remaining crew and stop if even that optimistic case misses the target.
-    // Stopping on diminishing returns alone would abandon targets that more
-    // crews would actually have met.
+    // Stop only when more crews genuinely change nothing. Proving the target
+    // unreachable is NOT a reason to stop: the caller still needs the shortest
+    // achievable programme, and abandoning the search early reports a worse
+    // best-effort than the engine can actually deliver. Each attempt is one
+    // CPM solve, so searching the full range is cheap.
     if (attempts.length >= 2) {
       const prev = attempts[attempts.length - 2];
       const curr = attempts[attempts.length - 1];
-      const marginal = prev.durationWorkingDays - curr.durationWorkingDays;
-      const available = schedule.feasibility.availableWorkingDays;
-
-      if (marginal <= 0) break; // more crews genuinely change nothing
-
-      if (available !== undefined) {
-        const remainingCrews = maxCrews - crews;
-        const bestPossible = curr.durationWorkingDays - marginal * remainingCrews;
-        if (bestPossible > available) break;
-      }
+      if (prev.durationWorkingDays - curr.durationWorkingDays <= 0) break;
     }
   }
 
@@ -121,9 +112,8 @@ export function generateWithinTarget(
       `${chosen.schedule.projectDurationWorkingDays} working days with ` +
       `${chosen.crews} crew(s), still ${gap} working day(s) over. ` +
       (lastTried < maxCrews
-        ? `The search stopped at ${lastTried} crew(s): even if every further crew ` +
-          `saved as much as the last one did, the target would still be missed. ` +
-          `The remaining critical path is governed by lead times, approvals and ` +
+        ? `Extra crews stopped shortening the programme at ${lastTried}: the ` +
+          `remaining critical path is governed by lead times, approvals and ` +
           `curing rather than by labour.`
         : `Searched up to ${maxCrews} crews.`),
   };
