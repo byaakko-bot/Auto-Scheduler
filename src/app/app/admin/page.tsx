@@ -1,9 +1,16 @@
+import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Settings, Users, FileStack } from "lucide-react";
+import { currentUser, hasRole } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminPage() {
+export default async function AdminPage() {
+  // Workspace configuration is owner/admin territory. 404 rather than 403 so
+  // the page does not advertise its own existence to a project manager.
+  const user = await currentUser();
+  if (!user || !hasRole(user, "ADMIN")) notFound();
+
   const sections = [
     { icon: Users, title: "Users & roles", body: "Invite team members and assign roles (Owner, Admin, PM, Site Manager, Viewer)." },
     { icon: FileStack, title: "Schedule templates", body: "Manage method templates and default productivity rates per construction method." },

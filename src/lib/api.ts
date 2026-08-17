@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { db } from "./prisma";
+import { AuthError } from "./auth/session";
+import { AuthConfigError } from "./auth/config";
 
 export function ok<T>(data: T, status = 200) {
   return NextResponse.json(data, { status });
@@ -14,18 +16,18 @@ export function handleError(err: unknown) {
   if (err instanceof ZodError) {
     return fail("Validation failed", 422, err.flatten());
   }
+  // Denials carry their own status. Letting them fall through to 500 would
+  // turn "you may not see this" into "the server is broken".
+  if (err instanceof AuthError) {
+    return fail(err.message, err.status);
+  }
+  if (err instanceof AuthConfigError) {
+    console.error("[auth] refusing to serve:", err.message);
+    return fail(err.message, 500);
+  }
   const message = err instanceof Error ? err.message : "Unknown error";
   console.error("[api] error:", message);
   return fail(message, 500);
-}
-
-// In local/dev mode (auth bypassed) we attach work to a single default company.
-export async function getOrCreateDefaultCompany() {
-  const existing = await db.company.findFirst({ orderBy: { createdAt: "asc" } });
-  if (existing) return existing;
-  return db.company.create({
-    data: { name: "My Company", country: "—", city: "—" },
-  });
 }
 
 const DEFAULT_PARTIES: { name: string; type: string }[] = [

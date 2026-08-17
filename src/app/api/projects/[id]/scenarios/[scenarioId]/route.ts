@@ -1,3 +1,4 @@
+import { requireProject } from "@/lib/auth/session";
 import { db } from "@/lib/prisma";
 import { fail, handleError, ok } from "@/lib/api";
 import { loadNetwork } from "@/lib/schedule";
@@ -16,6 +17,8 @@ export async function GET(
   { params }: { params: { id: string; scenarioId: string } }
 ) {
   try {
+    // A project id in the URL is an identifier, not an authorisation.
+    await requireProject(params.id, "VIEWER");
     const scenario = await db.scenario.findFirst({
       where: { id: params.scenarioId, projectId: params.id },
       include: { changes: true },
@@ -115,6 +118,8 @@ export async function DELETE(
   { params }: { params: { id: string; scenarioId: string } }
 ) {
   try {
+    // A project id in the URL is an identifier, not an authorisation.
+    await requireProject(params.id, "PROJECT_MANAGER");
     const scenario = await db.scenario.findFirst({
       where: { id: params.scenarioId, projectId: params.id },
     });

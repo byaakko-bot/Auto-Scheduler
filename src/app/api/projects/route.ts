@@ -1,13 +1,16 @@
 import { db } from "@/lib/prisma";
-import { fail, getOrCreateDefaultCompany, handleError, ok } from "@/lib/api";
+import { fail, handleError, ok } from "@/lib/api";
 import { createProjectSchema } from "@/lib/validation";
+import { requireCompany, requireRole } from "@/lib/auth/session";
 import { DEFAULT_PRODUCTIVITY } from "@/engine/constants";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const user = await requireCompany();
     const projects = await db.project.findMany({
+      where: { companyId: user.companyId },
       orderBy: { createdAt: "desc" },
       include: { company: true, _count: { select: { tasks: true } } },
     });
@@ -19,10 +22,11 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    // The owning company comes from the session, never from the request body.
+    const user = await requireRole("PROJECT_MANAGER");
+
     const body = await req.json();
     const input = createProjectSchema.parse(body);
-
-    const company = await getOrCreateDefaultCompany();
 
     const existingCode = await db.project.findUnique({
       where: { code: input.code },
@@ -42,7 +46,7 @@ export async function POST(req: Request) {
         code: input.code,
         clientName: input.clientName ?? null,
         description: input.description ?? null,
-        companyId: company.id,
+        companyId: user.companyId,
         country: input.country,
         city: input.city,
         address: input.address ?? null,

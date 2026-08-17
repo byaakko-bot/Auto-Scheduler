@@ -1,3 +1,4 @@
+import { requireProject } from "@/lib/auth/session";
 import { db } from "@/lib/prisma";
 import { handleError, ok } from "@/lib/api";
 import { updateTaskSchema } from "@/lib/validation";
@@ -9,6 +10,8 @@ export async function PATCH(
   { params }: { params: { id: string; taskId: string } }
 ) {
   try {
+    // A project id in the URL is an identifier, not an authorisation.
+    await requireProject(params.id, "SITE_MANAGER");
     const body = await req.json();
     const input = updateTaskSchema.parse(body);
 

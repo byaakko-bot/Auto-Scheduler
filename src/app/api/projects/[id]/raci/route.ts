@@ -1,3 +1,4 @@
+import { requireProject } from "@/lib/auth/session";
 import { db } from "@/lib/prisma";
 import { handleError, ok } from "@/lib/api";
 import { raciUpdateSchema } from "@/lib/validation";
@@ -9,6 +10,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    // A project id in the URL is an identifier, not an authorisation.
+    await requireProject(params.id, "VIEWER");
     const workPackages = await db.workPackage.findMany({
       where: { projectId: params.id },
       orderBy: { sortOrder: "asc" },
@@ -51,6 +54,8 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    // A project id in the URL is an identifier, not an authorisation.
+    await requireProject(params.id, "PROJECT_MANAGER");
     const body = await req.json();
     const { updates } = raciUpdateSchema.parse(body);
 

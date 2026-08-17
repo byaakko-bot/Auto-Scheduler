@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/prisma";
+import { AuthError, requireProject } from "@/lib/auth/session";
 import { ProjectSettingsForm } from "@/components/app/ProjectSettingsForm";
 
 export const dynamic = "force-dynamic";
@@ -9,12 +10,17 @@ export default async function ProjectSettingsPage({
 }: {
   params: { id: string };
 }) {
-  const [project, taskCount] = await Promise.all([
-    db.project.findUnique({ where: { id: params.id } }),
-    db.task.count({ where: { projectId: params.id } }),
-  ]);
+  // Settings change the programme, so reading them is gated at the same level
+  // as changing them.
+  let project;
+  try {
+    ({ project } = await requireProject(params.id, "PROJECT_MANAGER"));
+  } catch (err) {
+    if (err instanceof AuthError) notFound();
+    throw err;
+  }
 
-  if (!project) notFound();
+  const taskCount = await db.task.count({ where: { projectId: project.id } });
 
   return (
     <div className="px-8 py-6">

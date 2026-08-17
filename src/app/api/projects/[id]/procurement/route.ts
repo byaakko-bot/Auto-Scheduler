@@ -1,3 +1,4 @@
+import { requireProject } from "@/lib/auth/session";
 import { db } from "@/lib/prisma";
 import { fail, handleError, ok } from "@/lib/api";
 import {
@@ -22,6 +23,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    // A project id in the URL is an identifier, not an authorisation.
+    await requireProject(params.id, "VIEWER");
     const project = await db.project.findUnique({ where: { id: params.id } });
     if (!project) return fail("Project not found", 404);
 
@@ -126,6 +129,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    // A project id in the URL is an identifier, not an authorisation.
+    await requireProject(params.id, "PROJECT_MANAGER");
     const project = await db.project.findUnique({ where: { id: params.id } });
     if (!project) return fail("Project not found", 404);
 

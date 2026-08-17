@@ -1,12 +1,14 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { supabaseCredentials } from "@/lib/auth/config";
 
 // Server-side Supabase client bound to the request cookies.
-// Returns null when Supabase env vars are not configured (local dev mode).
+// Returns null only when running with the explicit development bypass, which
+// `@/lib/auth/config` refuses to allow in production.
 export function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return null;
+  const credentials = supabaseCredentials();
+  if (!credentials) return null;
+  const { url, anonKey } = credentials;
 
   const cookieStore = cookies();
   return createServerClient(url, anonKey, {
@@ -32,9 +34,6 @@ export function createClient() {
   });
 }
 
-export function authDisabled(): boolean {
-  return (
-    process.env.NEXT_PUBLIC_DISABLE_AUTH === "true" ||
-    !process.env.NEXT_PUBLIC_SUPABASE_URL
-  );
-}
+// Auth mode now has a single home. Re-exported so existing imports keep
+// working, but `@/lib/auth/config` is the source of truth.
+export { isDevBypass, authMode } from "@/lib/auth/config";

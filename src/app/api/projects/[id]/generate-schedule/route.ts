@@ -1,3 +1,4 @@
+import { requireProject } from "@/lib/auth/session";
 import { randomUUID } from "crypto";
 import { db } from "@/lib/prisma";
 import { ensureProjectParties, fail, handleError, ok } from "@/lib/api";
@@ -19,6 +20,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    // A project id in the URL is an identifier, not an authorisation.
+    await requireProject(params.id, "PROJECT_MANAGER");
     const project = await db.project.findUnique({ where: { id: params.id } });
     if (!project) return fail("Project not found", 404);
 

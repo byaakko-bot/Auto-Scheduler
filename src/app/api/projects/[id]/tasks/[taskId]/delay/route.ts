@@ -1,3 +1,4 @@
+import { requireProject } from "@/lib/auth/session";
 import { db } from "@/lib/prisma";
 import { fail, handleError, ok } from "@/lib/api";
 import { loadNetwork, persistablePatch } from "@/lib/schedule";
@@ -20,6 +21,8 @@ export async function POST(
   { params }: { params: { id: string; taskId: string } }
 ) {
   try {
+    // A project id in the URL is an identifier, not an authorisation.
+    await requireProject(params.id, "SITE_MANAGER");
     const loaded = await loadNetwork(params.id);
     if (!loaded) return fail("Project not found", 404);
     const { project, nodes, calendar, codeToId, tasks } = loaded;
