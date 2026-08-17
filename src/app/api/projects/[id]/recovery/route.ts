@@ -3,6 +3,7 @@ import { loadNetwork } from "@/lib/schedule";
 import { offsetOfDate } from "@/engine/calendarEngine";
 import { bindingFor } from "@/engine/activityRates";
 import { buildRateLookup } from "@/engine/productivity";
+import { cycleFloorDays } from "@/engine/constants";
 import { generateRecoveryPlan, type ScalableActivity } from "@/engine/recovery";
 import type { ConstructionMethod } from "@/engine/types";
 
@@ -64,6 +65,13 @@ export async function GET(
         quantity: t.quantity,
         outputPerCrewDay: rate.outputPerDay,
         rateCode: rate.code,
+        // Cycle-governed work cannot be compressed by labour, so recovery must
+        // not offer savings the generator would refuse to produce.
+        minDays: cycleFloorDays(
+          t.code,
+          project.constructionMethod as ConstructionMethod,
+          project.numberOfFloors
+        ),
       });
     }
 

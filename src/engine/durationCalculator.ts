@@ -1,5 +1,9 @@
 import { bindingFor } from "./activityRates";
-import { METHOD_MODIFIERS, STRUCTURE_CYCLE_DAYS_PER_FLOOR } from "./constants";
+import {
+  METHOD_MODIFIERS,
+  STRUCTURE_CYCLE_DAYS_PER_FLOOR,
+  cycleFloorDays,
+} from "./constants";
 import { buildRateLookup, durationFor } from "./productivity";
 import { takeoff } from "./quantities";
 import type {
@@ -206,18 +210,15 @@ function computeQuantity(
 }
 
 
-// Activities whose duration is set by a repeating cycle rather than by how
-// much labour is thrown at them. Currently the superstructure: one cycle per
-// floor, and curing inside each cycle is not compressible.
-const CYCLE_CONSTRAINED = new Set(["ST1"]);
-
 function cycleConstrainedDays(
   activityCode: string,
   inputs: ProjectInputs
 ): number {
-  if (!CYCLE_CONSTRAINED.has(activityCode)) return 0;
-  const perFloor = STRUCTURE_CYCLE_DAYS_PER_FLOOR[inputs.constructionMethod] ?? 0;
-  return Math.max(inputs.numberOfFloors, 1) * perFloor;
+  return cycleFloorDays(
+    activityCode,
+    inputs.constructionMethod,
+    inputs.numberOfFloors
+  );
 }
 
 /**

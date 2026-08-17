@@ -69,6 +69,23 @@ export const STRUCTURE_CYCLE_DAYS_PER_FLOOR: Record<ConstructionMethod, number> 
   MODULAR: 3,
 };
 
+/** Activities governed by a repeating cycle rather than by labour applied. */
+export const CYCLE_CONSTRAINED_ACTIVITIES = new Set(["ST1"]);
+
+/**
+ * Irreducible duration for a cycle-governed activity, in working days.
+ * Shared by the duration calculator and the recovery planner so recovery can
+ * never promise a saving the generator would refuse to deliver.
+ */
+export function cycleFloorDays(
+  activityCode: string,
+  method: ConstructionMethod,
+  numberOfFloors: number
+): number {
+  if (!CYCLE_CONSTRAINED_ACTIVITIES.has(activityCode)) return 0;
+  return Math.max(numberOfFloors, 1) * (STRUCTURE_CYCLE_DAYS_PER_FLOOR[method] ?? 0);
+}
+
 export const DEFAULT_PRODUCTIVITY: ProductivityRates = {
   foundationM3PerDay: 15,
   structureFloorDays: 21,

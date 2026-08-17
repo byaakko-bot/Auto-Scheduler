@@ -335,3 +335,45 @@ describe("§36 — method comparison", () => {
     expect(compareMethods([]).rows).toHaveLength(0);
   });
 });
+
+describe("recovery respects cycle-governed work", () => {
+  // A 5-storey frame with a 40-day cycle floor: 4,000 units at 100/crew-day
+  // would say 40d at one crew and 20d at two, but curing forbids the latter.
+  const cycleBound = new Map<string, ScalableActivity>([
+    [
+      "B",
+      {
+        crews: 1,
+        quantity: 4000,
+        outputPerCrewDay: 100,
+        rateCode: "CONCRETE_SLAB",
+        minDays: 40,
+      },
+    ],
+  ]);
+
+  it("does not offer crew savings that curing prevents", () => {
+    const plan = generateRecoveryPlan({ nodes: chain(), scalable: cycleBound });
+    expect(plan.options.filter((o) => o.strategy === "ADD_CREW")).toHaveLength(0);
+  });
+
+  it("explains why adding crews recovers nothing", () => {
+    const plan = generateRecoveryPlan({ nodes: chain(), scalable: cycleBound });
+    expect(plan.notes.join(" ")).toContain("cycle floor");
+  });
+
+  it("still offers crew savings above the floor", () => {
+    const headroom = new Map<string, ScalableActivity>([
+      ["B", { crews: 1, quantity: 4000, outputPerCrewDay: 100, rateCode: "X", minDays: 10 }],
+    ]);
+    const plan = generateRecoveryPlan({ nodes: chain(), scalable: headroom });
+    const opt = plan.options.find((o) => o.id === "ADD_CREW:B:1")!;
+    expect(opt).toBeDefined();
+    expect(opt.recoveryDays).toBe(20); // 40d -> 20d, still above the 10d floor
+  });
+
+  it("does not let overtime breach the cycle floor either", () => {
+    const plan = generateRecoveryPlan({ nodes: chain(), scalable: cycleBound });
+    expect(plan.options.filter((o) => o.strategy === "OVERTIME")).toHaveLength(0);
+  });
+});

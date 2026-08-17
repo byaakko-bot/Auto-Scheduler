@@ -30,6 +30,12 @@ export interface ScalableActivity {
   outputPerCrewDay: number;
   /** Rate code, for traceability. */
   rateCode: string;
+  /**
+   * Irreducible duration for cycle-governed work (e.g. a floor-by-floor
+   * frame whose curing no crew count compresses). Recovery must respect it,
+   * or it would promise savings the generator refuses to deliver.
+   */
+  minDays?: number;
 }
 
 export interface RecoveryInput {
@@ -87,7 +93,8 @@ function clone(nodes: ScheduleNode[]): ScheduleNode[] {
 
 function durationFor(a: ScalableActivity, crews: number): number {
   const output = a.outputPerCrewDay * Math.max(crews, 1);
-  return output > 0 ? Math.max(1, Math.ceil(a.quantity / output)) : 1;
+  const fromCapacity = output > 0 ? Math.ceil(a.quantity / output) : 1;
+  return Math.max(1, fromCapacity, a.minDays ?? 0);
 }
 
 export function generateRecoveryPlan(
@@ -120,7 +127,16 @@ export function generateRecoveryPlan(
 
       const newDuration = durationFor(activity, crews);
       const saved = durationFor(activity, activity.crews) - newDuration;
-      if (saved <= 0) continue;
+      if (saved <= 0) {
+        if (activity.minDays && newDuration <= activity.minDays) {
+          notes.push(
+            `Adding crews to ${code} recovers nothing: it is already at its ` +
+              `${activity.minDays}-day cycle floor, which curing and floor-by-floor ` +
+              `sequencing prevent any crew count from breaching.`
+          );
+        }
+        continue;
+      }
 
       const trial = clone(input.nodes);
       const node = trial.find((n) => n.taskId === code);
@@ -181,9 +197,15 @@ export function generateRecoveryPlan(
     for (const [code, activity] of overtimeTargets) {
       const node = trial.find((n) => n.taskId === code);
       if (!node) continue;
+      // Longer shifts raise output but cannot breach a cycle floor either:
+      // concrete cures at the same rate at 10pm as at 3pm.
       const uplifted = Math.max(
         1,
-        Math.ceil(activity.quantity / (activity.outputPerCrewDay * activity.crews * overtimeFactor))
+        Math.ceil(
+          activity.quantity /
+            (activity.outputPerCrewDay * activity.crews * overtimeFactor)
+        ),
+        activity.minDays ?? 0
       );
       if (uplifted < node.durationDays) {
         totalCrewDays += uplifted * activity.crews;
